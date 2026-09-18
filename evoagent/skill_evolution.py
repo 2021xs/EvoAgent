@@ -11,6 +11,7 @@ from .evolution import RegressionEvaluator
 from .finding_identity import canonical_identity
 from .llm import JsonChatClient
 from .reviewer import Reviewer
+from .releases import ReleaseBundle, ReleaseNotFound
 from .skills import AgentSkill, SKILL_NAME
 from .store import utc_now
 from .telemetry import ExecutionLedger
@@ -156,13 +157,35 @@ def validate_artifact(artifact: Any, expected_name: str = "") -> dict:
 class _ReplayTaskStore:
     def __init__(self, skill_name: str):
         self.skill_name = skill_name
+        self.tasks = {}
+        self.releases = {}
 
-    def get(self, _task_id: str, _tenant_id: Optional[str] = None) -> dict:
-        return {"input": {
+    def pin(self, task_id: str, spec: dict) -> None:
+        release = ReleaseBundle.create("default", spec, "skill-replay").to_dict()
+        self.releases[release["release_id"]] = release
+        self.tasks[task_id] = {
+            "release_id": release["release_id"],
+            "input": {
+                "mode": "agentic",
+                "enabled_agents": [
+                    "lead", "security", "correctness-reliability", "critic",
+                ],
+                "enabled_skills": [self.skill_name],
+            },
+        }
+
+    def get(self, task_id: str, _tenant_id: Optional[str] = None) -> dict:
+        return dict(self.tasks.get(task_id) or {"input": {
             "mode": "agentic",
             "enabled_agents": ["lead", "security", "correctness-reliability", "critic"],
             "enabled_skills": [self.skill_name],
-        }}
+        }})
+
+    def get_release(self, release_id: str, tenant_id: str) -> dict:
+        release = self.releases.get(release_id)
+        if not release or release["tenant_id"] != tenant_id:
+            raise ReleaseNotFound("Skill replay Release does not exist")
+        return dict(release)
 
 
 class AgentSkillReplayReviewer(Reviewer):
@@ -177,8 +200,9 @@ class AgentSkillReplayReviewer(Reviewer):
         self._last_task_id = ""
         self.token_budget = int(token_budget)
         self.time_budget_seconds = int(time_budget_seconds)
+        self.store = _ReplayTaskStore(self.skill.name)
         self.agentic = AgenticReviewer(
-            _ReplayTaskStore(self.skill.name), client,
+            self.store, client,
             default_token_budget=token_budget,
             default_time_budget=time_budget_seconds,
             skill_provider=lambda _tenant: [self.skill],
@@ -190,6 +214,11 @@ class AgentSkillReplayReviewer(Reviewer):
     def review_case(self, case: dict, parsed) -> list:
         self._sequence += 1
         self._last_task_id = "skill-replay:%s:%d" % (self.skill.name, self._sequence)
+        roles = ["lead", "security", "correctness-reliability", "critic"]
+        self.store.pin(self._last_task_id, self.agentic.build_release_spec(
+            {self.skill.name: self.skill}, roles, [self.skill.name],
+            self.agentic.scanners,
+        ))
         return self.agentic.review_with_context(
             self._last_task_id, case["diff"], parsed,
             repository=str(case.get("repository_root") or case.get("repository") or ""),

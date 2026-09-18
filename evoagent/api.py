@@ -446,7 +446,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/skills/reload":
                 principal = self._principal("manage")
-                self._send_json(200, {"skills": self.service.reload_skills(),
+                self._send_json(200, {"skills": self.service.reload_skills(principal.tenant_id),
                                       "note": "New tasks now use the reloaded skill set."})
                 return
             if path == "/v1/deployments/llm-review":
@@ -488,18 +488,18 @@ class ApiHandler(BaseHTTPRequestHandler):
                     str(payload.get("skill_name", "llm-review")), principal.tenant_id
                 )
                 if result["decision"] == "activated":
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self._send_json(201, result)
                 return
             if path == "/v1/evolution/propose":
-                self._principal("manage")
+                principal = self._principal("manage")
                 payload = self._read_json(body)
                 result = self.service.evolution.propose(
                     str(payload.get("skill_name", "")), str(payload.get("prompt", "")),
                     float(payload["regression_score"]) if "regression_score" in payload else None,
                 )
                 if result["decision"] == "activated":
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self._send_json(201, result)
                 return
             if path == "/v1/skill-evolution/auto":
@@ -509,7 +509,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     str(payload.get("skill_name", "evolved-review")), principal.tenant_id
                 )
                 if result["decision"] == "activated":
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self.service.store.audit(
                     principal.tenant_id, principal.username, "skill.evolution.auto",
                     str(payload.get("skill_name", "evolved-review")),
@@ -532,7 +532,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     principal.tenant_id,
                 )
                 if result["decision"] == "activated":
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self.service.store.audit(
                     principal.tenant_id, principal.username, "skill.evolution.propose",
                     str(payload.get("skill_name", "")),
@@ -547,7 +547,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     match.group(1), int(match.group(2)), principal.tenant_id
                 )
                 if ok:
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self.service.store.audit(
                     principal.tenant_id, principal.username, "skill.evolution.activate",
                     match.group(1), {"version": int(match.group(2)), "activated": ok},
@@ -561,7 +561,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     match.group(1), principal.tenant_id
                 )
                 if ok:
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self.service.store.audit(
                     principal.tenant_id, principal.username, "skill.evolution.fallback",
                     match.group(1), {"fallback_to_bundled": ok},
@@ -570,10 +570,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return
             match = ROLLBACK.match(path)
             if match:
-                self._principal("manage")
+                principal = self._principal("manage")
                 ok = self.service.evolution.rollback(match.group(1), int(match.group(2)))
                 if ok:
-                    self.service.reload_skills()
+                    self.service.reload_skills(principal.tenant_id)
                 self._send_json(200 if ok else 404, {"activated": ok})
                 return
             self._send_json(404, {"error": "not found"})

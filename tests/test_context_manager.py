@@ -3,11 +3,11 @@ import os
 import tempfile
 import unittest
 
-from evoagent.agentic_core import AgenticReviewer
 from evoagent.context_manager import ContextManager, estimate_tokens
 from evoagent.diff_parser import parse_unified_diff
 from evoagent.memory import MemoryManager
 from evoagent.store import TaskStore
+from tests.release_fixture import PinnedAgenticReviewer as AgenticReviewer
 
 
 def large_diff():

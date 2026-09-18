@@ -73,7 +73,18 @@ class ReviewHarness:
         if checkpoints.get("reviewing", {}).get("status") == "completed":
             self._ctx.state = TaskState.REVIEWING
         try:
-            result = self.runtime.execute(
+            budget_reader = getattr(self.reviewer, "runtime_budget", None)
+            budget = (
+                budget_reader(task_id, tenant_id) if callable(budget_reader) else {
+                    "max_steps": self.max_steps,
+                    "timeout_seconds": self.timeout_seconds,
+                    "node_retries": self.node_retries,
+                }
+            )
+            runtime = AgentRuntime(
+                budget["max_steps"], budget["timeout_seconds"], budget["node_retries"],
+            )
+            result = runtime.execute(
                 state,
                 [
                     RuntimeNode("planning", self._planning),

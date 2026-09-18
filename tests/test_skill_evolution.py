@@ -667,7 +667,7 @@ class SkillEvolutionTests(unittest.TestCase):
             self.assertTrue(service.fallback_skill_to_bundled(
                 "security-review", "tenant-a"
             ))
-            service.reload_skills()
+            service.reload_skills("tenant-a")
             fallback = {
                 skill.name: skill for skill in service._active_agent_skills("tenant-a")
             }["security-review"]
@@ -741,7 +741,7 @@ class SkillEvolutionTests(unittest.TestCase):
                 self.reloads = 0
                 self.fallback = True
 
-            def reload_skills(self):
+            def reload_skills(self, _tenant_id="default"):
                 self.reloads += 1
 
             def fallback_skill_to_bundled(self, *_args):

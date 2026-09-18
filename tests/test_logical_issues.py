@@ -5,7 +5,6 @@ import tempfile
 import unittest
 
 from evoagent.agentic_core import (
-    AgenticReviewer,
     LogicalIssueError,
     MAX_LOGICAL_ISSUE_MODEL_EVIDENCE_REFS,
 )
@@ -20,6 +19,7 @@ from tests.test_lead_worker_collaboration import (
     HierarchicalClient,
     RecordingTaskStore,
 )
+from tests.release_fixture import PinnedAgenticReviewer as AgenticReviewer
 
 
 def finding(

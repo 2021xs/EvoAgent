@@ -260,16 +260,22 @@ def run_case_arm(case: dict, arm: str, cases: list, real_model: bool) -> dict:
         _write_repository(repository_root, case)
         store = TaskStore(os.path.join(temporary, "pilot.db"))
         task_id = "pilot-%s-%s" % (case["case_id"], arm)
-        store.create(task_id, case["repository"], 1, {
-            "mode": "agentic",
-            "enabled_agents": ["lead", case["worker"], "critic"],
-            "repository_root": repository_root,
-        })
         client = PilotClient(cases, _real_client() if real_model else None)
         reviewer_type = OneShotAgenticReviewer if arm == "one_shot" else AgenticReviewer
         reviewer = reviewer_type(
             store, client, default_token_budget=8000, default_time_budget=30,
         )
+        enabled_roles = ["lead", case["worker"], "critic"]
+        release = store.put_release(
+            "default", reviewer.build_release_spec(
+                {}, enabled_roles, [], reviewer.scanners,
+            ),
+        )
+        store.create(task_id, case["repository"], 1, {
+            "mode": "agentic",
+            "enabled_agents": enabled_roles,
+            "repository_root": repository_root,
+        }, release_id=release["release_id"])
         findings = reviewer.review_with_context(
             task_id, case["diff"], parse_unified_diff(case["diff"]),
             case["repository"],

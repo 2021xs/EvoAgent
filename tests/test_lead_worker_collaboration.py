@@ -5,11 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from evoagent.agentic_core import (
-    AgenticReviewer,
-    ExecutionConfigurationError,
-    ensure_candidate_identity,
-)
+from evoagent.agentic_core import ExecutionConfigurationError, ensure_candidate_identity
 from evoagent.context_manager import ContextManager
 from evoagent.diff_parser import parse_unified_diff
 from evoagent.gates import FindingGate
@@ -18,6 +14,7 @@ from evoagent.models import Finding, Severity
 from evoagent.repository_tools import RepositoryToolSuite
 from evoagent.skills import AgentSkill
 from evoagent.store import TaskStore
+from tests.release_fixture import PinnedAgenticReviewer as AgenticReviewer
 
 
 DIFF = "--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-old\n+eval(user_input)\n"
@@ -543,7 +540,7 @@ Historical CWE-95 guidance.
         for _role, payload in client.payloads:
             self.assertNotIn("worker_execution_snapshots", json.dumps(payload))
 
-    def test_execution_profile_is_created_once_at_first_agent_execution(self):
+    def test_execution_profile_is_one_release_reference(self):
         calls = []
         skill = agent_skill("1", "PINNED-V1")
         reviewer = AgenticReviewer(
@@ -563,11 +560,16 @@ Historical CWE-95 guidance.
         self.assertEqual(1, len({item["profile_sha256"] for item in profiles}))
         self.assertEqual(["default"], calls)
         first = profiles[0]
-        self.assertEqual("1", first["skills"][0]["version"])
-        self.assertEqual(skill.content_sha256, first["skills"][0]["content_sha256"])
+        self.assertEqual(self.store.get("task")["release_id"], first["release_id"])
+        release = self.store.get_release(first["release_id"], "default")
+        pinned_skill = release["spec"]["skills"][0]
+        self.assertEqual("1", pinned_skill["version"])
+        self.assertEqual(skill.content_sha256, pinned_skill["content_sha256"])
         self.assertEqual("PINNED-V1", AgentSkill.from_artifact(
-            first["skills"][0]["artifact"], "1",
+            pinned_skill["artifact"], "1",
         ).instructions)
+        self.assertNotIn("skills", first)
+        self.assertNotIn("prompt_policy", first)
 
         self.store.create("queued-only", "org/repo", 2, {"mode": "agentic"})
         self.assertNotIn(
@@ -718,14 +720,13 @@ Historical CWE-95 guidance.
             ).review_with_context(
                 "task", DIFF, parse_unified_diff(DIFF), "org/repo",
             )
-        with self.assertRaisesRegex(
-            ExecutionConfigurationError, "configuration changed.*default_token_budget",
-        ):
-            AgenticReviewer(
-                self.store, HierarchicalClient(), default_token_budget=9000,
-            ).review_with_context(
-                "task", DIFF, parse_unified_diff(DIFF), "org/repo",
-            )
+        # Configurable budgets are materialized from the pinned Release rather
+        # than compared with the current process default.
+        AgenticReviewer(
+            self.store, HierarchicalClient(), default_token_budget=9000,
+        ).review_with_context(
+            "task", DIFF, parse_unified_diff(DIFF), "org/repo",
+        )
 
         class ChangedPolicyReviewer(AgenticReviewer):
             @classmethod
@@ -760,13 +761,13 @@ Historical CWE-95 guidance.
 
         corrupt = copy.deepcopy(session)
         profile = corrupt["execution_profile"]
-        profile["skills"][0]["artifact"]["files"]["SKILL.md"] += "\ntampered\n"
+        profile["release_spec_sha256"] = "0" * 64
         unsigned = dict(profile)
         unsigned.pop("profile_sha256", None)
         profile["profile_sha256"] = AgenticReviewer._value_sha256(unsigned)
         self.restore_lead_session(corrupt)
         with self.assertRaisesRegex(
-            ExecutionConfigurationError, "Skill hash mismatch",
+            ExecutionConfigurationError, "does not match.*pinned Release",
         ):
             AgenticReviewer(
                 self.store, HierarchicalClient(), skill_provider=lambda _tenant: [],
@@ -793,7 +794,7 @@ Bounded guidance.
             },
         )
         with self.assertRaisesRegex(
-            ExecutionConfigurationError, "checkpoint limit",
+            ExecutionConfigurationError, "Release specification.*size limit",
         ):
             AgenticReviewer(
                 self.store, HierarchicalClient(),

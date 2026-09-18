@@ -5,6 +5,7 @@ import copy
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
+import inspect
 import json
 import os
 import textwrap
@@ -28,7 +29,8 @@ from .finding_identity import canonical_identity
 from .llm import JsonChatClient
 from .models import ComponentKind, Finding, Severity
 from .modes import component, resolve_mode
-from .repository_tools import RepositoryToolSuite
+from .repository_tools import ARTIFACT_REPLAYABLE_TOOLS, RepositoryToolSuite
+from .releases import RELEASE_SPEC_SCHEMA_VERSION, ReleaseError
 from .reviewer import LocalRuleReviewer, Reviewer
 from .runtime import AgentTool, RuntimeBudgetExceeded, ToolRegistry
 from .skills import AgentSkill
@@ -122,10 +124,10 @@ ROLE_PERMISSIONS = {
 }
 
 
-EXECUTION_PROFILE_SCHEMA_VERSION = 1
-# Current bundled Agent Skills total only tens of KiB.  Keep the private
-# checkpoint bounded without introducing a separate artifact store.
-MAX_EXECUTION_PROFILE_BYTES = 2 * 1024 * 1024
+EXECUTION_PROFILE_SCHEMA_VERSION = 2
+# Release specifications contain complete Skill artifacts and remain bounded.
+# Checkpoints contain only a small integrity-bound reference to this Release.
+MAX_RELEASE_SPEC_BYTES = 2 * 1024 * 1024
 EVIDENCE_PREVIEW_CHARS = DEFAULT_ARTIFACT_READ_CHARS
 LOGICAL_ISSUE_SCHEMA_VERSION = 1
 MAX_LOGICAL_ISSUE_MODEL_EVIDENCE_REFS = 20
@@ -577,6 +579,10 @@ class AgenticReviewer(Reviewer):
         memory_manager=None,
         context_manager: Optional[ContextManager] = None,
         skill_provider=None,
+        prompt_version: str = "bundled",
+        workflow_max_steps: int = 8,
+        workflow_timeout_seconds: int = 120,
+        workflow_node_retries: int = 2,
     ):
         self.store = store
         self.client = llm_client
@@ -596,6 +602,10 @@ class AgenticReviewer(Reviewer):
         self.memory_manager = memory_manager
         self.context_manager = context_manager or ContextManager()
         self.skill_provider = skill_provider
+        self.prompt_version = str(prompt_version or "bundled")
+        self.workflow_max_steps = int(workflow_max_steps)
+        self.workflow_timeout_seconds = int(workflow_timeout_seconds)
+        self.workflow_node_retries = int(workflow_node_retries)
         if self.structured_config:
             self.prompt_overlay += "\nStructured runtime policy:\n" + json.dumps(
                 self.structured_config, ensure_ascii=False, sort_keys=True
@@ -627,11 +637,81 @@ class AgenticReviewer(Reviewer):
         }
 
     def _model_identity(self) -> Dict[str, Any]:
+        headers = dict(getattr(self.client, "extra_headers", {}) or {})
         return {
             "provider": str(getattr(self.client, "provider", "")),
             "model": str(getattr(self.client, "model", "")),
             "base_url": str(getattr(self.client, "base_url", "")).rstrip("/"),
             "timeout_seconds": getattr(self.client, "timeout", None),
+            "generation_config": {
+                "temperature": 0,
+                "response_format": "json_object",
+            },
+            "transport_headers_sha256": self._value_sha256(headers),
+        }
+
+    def _memory_policy(self) -> Dict[str, Any]:
+        manager = self.memory_manager
+        return {
+            "enabled": bool(getattr(manager, "enabled", False)),
+            "recall_limit": int(getattr(manager, "recall_limit", 0) or 0),
+            "working_ttl_seconds": int(
+                getattr(manager, "working_ttl_seconds", 0) or 0
+            ),
+        }
+
+    @classmethod
+    def _implementation_sha256(cls, value: Any) -> str:
+        try:
+            source = inspect.getsource(value)
+        except (OSError, TypeError):
+            source = "%s.%s" % (
+                getattr(value, "__module__", ""), getattr(value, "__qualname__", ""),
+            )
+        return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _tool_policy_sha256(cls) -> str:
+        empty = RepositoryToolSuite("", "", ParsedDiff([], []))
+        catalogs = {}
+        for role, permissions in sorted(ROLE_PERMISSIONS.items()):
+            registry = empty.registry(role, permissions)
+            catalogs[role] = [{
+                **entry,
+                "artifact_replay": entry["name"] in ARTIFACT_REPLAYABLE_TOOLS,
+            } for entry in registry.catalog()]
+        return cls._value_sha256({
+            "repository_tools": catalogs,
+            "artifact_replayable_tools": sorted(ARTIFACT_REPLAYABLE_TOOLS),
+            "runtime_extensions": {
+                "read_artifact": cls._implementation_sha256(
+                    cls._register_artifact_read_tool
+                ),
+                "read_skill_resource": cls._implementation_sha256(
+                    cls._register_skill_resource_tool
+                ),
+            },
+        })
+
+    def _scanner_policy(self, scanners: Iterable[Any]) -> List[Dict[str, Any]]:
+        return [
+            {
+                "name": str(getattr(scanner, "name", type(scanner).__name__)),
+                "implementation": "%s.%s" % (
+                    type(scanner).__module__, type(scanner).__qualname__,
+                ),
+                "implementation_sha256": self._implementation_sha256(type(scanner)),
+                "domains": list(getattr(scanner, "domains", ()) or ()),
+                "rule_ids": sorted(getattr(scanner, "rule_ids", ()) or ()),
+            }
+            for scanner in scanners
+        ]
+
+    def _gate_policy(self) -> Dict[str, Any]:
+        return {
+            "minimum_confidence": float(self.gate.minimum_confidence),
+            "strong_evidence_tools": sorted(FindingGate.STRONG_EVIDENCE_TOOLS),
+            "implementation_sha256": self._implementation_sha256(FindingGate),
         }
 
     @classmethod
@@ -671,37 +751,36 @@ class AgenticReviewer(Reviewer):
             "effective_enabled_roles": sorted(set(effective_roles)),
             "requested_skills": list(requested_skills),
             "review_test_command": self.review_test_command,
-            "scanner_policy": [
-                {
-                    "name": str(getattr(scanner, "name", type(scanner).__name__)),
-                    "implementation": "%s.%s" % (
-                        type(scanner).__module__, type(scanner).__qualname__,
-                    ),
-                    "domains": list(getattr(scanner, "domains", ()) or ()),
-                    "rule_ids": sorted(getattr(scanner, "rule_ids", ()) or ()),
-                }
-                for scanner in (self.scanners if scanners is None else scanners)
-            ],
+            "scanner_policy": self._scanner_policy(
+                self.scanners if scanners is None else scanners
+            ),
+            "tool_policy_sha256": self._tool_policy_sha256(),
+            "memory_policy": self._memory_policy(),
+            "workflow_budget": {
+                "max_steps": self.workflow_max_steps,
+                "timeout_seconds": self.workflow_timeout_seconds,
+                "node_retries": self.workflow_node_retries,
+            },
             "code_policy_sha256": self._code_policy_sha256(),
         }
 
-    def _create_execution_profile(
-        self, task_id: str, tenant_id: str, available_skills: Dict[str, AgentSkill],
+    def build_release_spec(
+        self, available_skills: Dict[str, AgentSkill],
         effective_roles: Iterable[str], requested_skills: Iterable[str],
         scanners: Optional[Iterable[Any]] = None,
     ) -> Dict[str, Any]:
         prompt_policy = {
+            "version": self.prompt_version,
             "overlay": self.prompt_overlay,
             "structured_config": copy.deepcopy(self.structured_config),
         }
         prompt_policy["sha256"] = self._value_sha256({
+            "version": prompt_policy["version"],
             "overlay": prompt_policy["overlay"],
             "structured_config": prompt_policy["structured_config"],
         })
-        profile = {
-            "schema_version": EXECUTION_PROFILE_SCHEMA_VERSION,
-            "task_id": task_id,
-            "tenant_id": tenant_id,
+        spec = {
+            "schema_version": RELEASE_SPEC_SCHEMA_VERSION,
             "skills": [
                 {
                     "name": skill.name,
@@ -716,47 +795,34 @@ class AgenticReviewer(Reviewer):
             "runtime_identity": self._runtime_identity(
                 effective_roles, requested_skills, scanners,
             ),
+            "gate_policy": self._gate_policy(),
         }
-        profile["profile_sha256"] = self._value_sha256(profile)
-        self._validate_profile_size(profile)
-        # Validate exactly the serialized representation before it becomes the
-        # authoritative resume source.
-        self._restore_execution_profile(
-            profile, task_id, tenant_id, effective_roles, requested_skills, scanners,
+        self._validate_profile_size(spec)
+        self._materialize_release_spec(
+            spec, effective_roles, requested_skills, scanners,
         )
-        return profile
+        return spec
 
     @classmethod
     def _validate_profile_size(cls, profile: Dict[str, Any]) -> None:
         size = len(cls._canonical_json(profile).encode("utf-8"))
-        if size > MAX_EXECUTION_PROFILE_BYTES:
+        if size > MAX_RELEASE_SPEC_BYTES:
             raise ExecutionConfigurationError(
-                "agent execution profile exceeds the %d-byte checkpoint limit"
-                % MAX_EXECUTION_PROFILE_BYTES
+                "Release specification exceeds the %d-byte size limit"
+                % MAX_RELEASE_SPEC_BYTES
             )
 
-    def _restore_execution_profile(
-        self, profile: Dict[str, Any], task_id: str, tenant_id: str,
+    def _materialize_release_spec(
+        self, profile: Dict[str, Any],
         effective_roles: Iterable[str], requested_skills: Iterable[str],
         scanners: Optional[Iterable[Any]] = None,
-    ) -> Dict[str, AgentSkill]:
+    ) -> tuple:
         if not isinstance(profile, dict):
-            raise ExecutionConfigurationError("agent execution profile is malformed")
+            raise ExecutionConfigurationError("Release specification is malformed")
         self._validate_profile_size(profile)
-        if profile.get("schema_version") != EXECUTION_PROFILE_SCHEMA_VERSION:
+        if profile.get("schema_version") != RELEASE_SPEC_SCHEMA_VERSION:
             raise ExecutionConfigurationError(
-                "unsupported agent execution profile schema"
-            )
-        if profile.get("task_id") != task_id or profile.get("tenant_id") != tenant_id:
-            raise ExecutionConfigurationError(
-                "agent execution profile does not belong to this Task/tenant"
-            )
-        expected_profile_hash = str(profile.get("profile_sha256", ""))
-        unsigned = dict(profile)
-        unsigned.pop("profile_sha256", None)
-        if not expected_profile_hash or self._value_sha256(unsigned) != expected_profile_hash:
-            raise ExecutionConfigurationError(
-                "agent execution profile integrity check failed"
+                "unsupported Release specification schema"
             )
 
         prompt_policy = profile.get("prompt_policy")
@@ -765,10 +831,14 @@ class AgenticReviewer(Reviewer):
         ):
             raise ExecutionConfigurationError("pinned prompt policy is malformed")
         prompt_payload = {
+            "version": str(prompt_policy.get("version", "")),
             "overlay": str(prompt_policy.get("overlay", "")),
             "structured_config": prompt_policy["structured_config"],
         }
-        if self._value_sha256(prompt_payload) != str(prompt_policy.get("sha256", "")):
+        if (
+            not prompt_payload["version"]
+            or self._value_sha256(prompt_payload) != str(prompt_policy.get("sha256", ""))
+        ):
             raise ExecutionConfigurationError("pinned prompt policy integrity check failed")
 
         runtime_identity = profile.get("runtime_identity")
@@ -777,10 +847,13 @@ class AgenticReviewer(Reviewer):
         current_identity = self._runtime_identity(
             effective_roles, requested_skills, scanners,
         )
+        if runtime_identity.get("effective_enabled_roles") != sorted(set(effective_roles)):
+            raise ExecutionConfigurationError("Task enabled roles do not match pinned Release")
+        if runtime_identity.get("requested_skills") != list(requested_skills):
+            raise ExecutionConfigurationError("Task requested Skills do not match pinned Release")
         guarded_keys = {
-            "model", "default_token_budget", "default_time_budget_seconds",
-            "context_manager", "effective_enabled_roles", "requested_skills",
-            "review_test_command", "scanner_policy", "code_policy_sha256",
+            "model", "context_manager", "scanner_policy", "tool_policy_sha256",
+            "memory_policy", "code_policy_sha256",
         }
         mismatches = sorted(
             key for key in guarded_keys
@@ -792,6 +865,22 @@ class AgenticReviewer(Reviewer):
                 "start a fresh Review Task to use the new configuration"
                 % ", ".join(mismatches)
             )
+
+        gate_policy = profile.get("gate_policy")
+        if not isinstance(gate_policy, dict):
+            raise ExecutionConfigurationError("pinned FindingGate policy is malformed")
+        current_gate = self._gate_policy()
+        for key in ("strong_evidence_tools", "implementation_sha256"):
+            if gate_policy.get(key) != current_gate.get(key):
+                raise ExecutionConfigurationError(
+                    "FindingGate implementation changed incompatibly: %s" % key
+                )
+        try:
+            gate = FindingGate(float(gate_policy["minimum_confidence"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExecutionConfigurationError(
+                "pinned FindingGate configuration is malformed"
+            ) from exc
 
         raw_skills = profile.get("skills")
         if not isinstance(raw_skills, list):
@@ -835,7 +924,71 @@ class AgenticReviewer(Reviewer):
                     "duplicate pinned Agent Skill: %s" % name
                 )
             restored[name] = skill
-        return restored
+        return restored, gate
+
+    def _execution_profile_reference(
+        self, task_id: str, tenant_id: str, release: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        profile = {
+            "schema_version": EXECUTION_PROFILE_SCHEMA_VERSION,
+            "task_id": task_id,
+            "tenant_id": tenant_id,
+            "release_id": release["release_id"],
+            "release_spec_sha256": release["spec_sha256"],
+        }
+        profile["profile_sha256"] = self._value_sha256(profile)
+        return profile
+
+    def _restore_execution_profile(
+        self, profile: Dict[str, Any], task_id: str, tenant_id: str,
+        release: Dict[str, Any], effective_roles: Iterable[str],
+        requested_skills: Iterable[str], scanners: Optional[Iterable[Any]] = None,
+    ) -> tuple:
+        if not isinstance(profile, dict):
+            raise ExecutionConfigurationError("agent execution profile is malformed")
+        if profile.get("schema_version") != EXECUTION_PROFILE_SCHEMA_VERSION:
+            raise ExecutionConfigurationError(
+                "unsupported agent execution profile schema; start a fresh Review Task"
+            )
+        if profile.get("task_id") != task_id or profile.get("tenant_id") != tenant_id:
+            raise ExecutionConfigurationError(
+                "agent execution profile does not belong to this Task/tenant"
+            )
+        expected_hash = str(profile.get("profile_sha256", ""))
+        unsigned = dict(profile)
+        unsigned.pop("profile_sha256", None)
+        if not expected_hash or self._value_sha256(unsigned) != expected_hash:
+            raise ExecutionConfigurationError("agent execution profile integrity check failed")
+        if (
+            profile.get("release_id") != release.get("release_id")
+            or profile.get("release_spec_sha256") != release.get("spec_sha256")
+        ):
+            raise ExecutionConfigurationError(
+                "agent execution profile does not match the Task's pinned Release"
+            )
+        return self._materialize_release_spec(
+            release["spec"], effective_roles, requested_skills, scanners,
+        )
+
+    def runtime_budget(self, task_id: str, tenant_id: str = "default") -> Dict[str, int]:
+        task = self.store.get(task_id, tenant_id)
+        release_id = str((task or {}).get("release_id") or "")
+        if not release_id:
+            raise ExecutionConfigurationError(
+                "Review Task has no pinned Release; start a fresh Review Task"
+            )
+        try:
+            release = self.store.get_release(release_id, tenant_id)
+            budget = release["spec"]["runtime_identity"]["workflow_budget"]
+            return {
+                "max_steps": int(budget["max_steps"]),
+                "timeout_seconds": int(budget["timeout_seconds"]),
+                "node_retries": int(budget["node_retries"]),
+            }
+        except ReleaseError as exc:
+            raise ExecutionConfigurationError("pinned Release cannot be loaded: %s" % exc) from exc
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExecutionConfigurationError("pinned Release workflow budget is malformed") from exc
 
     @staticmethod
     def _profile_prompt_policy(profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -912,27 +1065,36 @@ class AgenticReviewer(Reviewer):
         scanners = self.scanners + (
             list(self.scanner_provider(tenant_id)) if self.scanner_provider else []
         )
+        release_id = str(task.get("release_id") or "")
+        if not release_id:
+            raise ExecutionConfigurationError(
+                "Review Task has no pinned Release; start a fresh Review Task"
+            )
+        try:
+            release = self.store.get_release(release_id, tenant_id)
+        except ReleaseError as exc:
+            raise ExecutionConfigurationError(
+                "pinned Release cannot be loaded: %s" % exc
+            ) from exc
+        profile_reference = self._execution_profile_reference(
+            task_id, tenant_id, release,
+        )
         if session:
-            execution_profile = session.get("execution_profile")
-            if not isinstance(execution_profile, dict):
+            stored_reference = session.get("execution_profile")
+            if not isinstance(stored_reference, dict):
                 raise ExecutionConfigurationError(
                     "existing agentic Task has no execution profile; start a fresh Review Task"
                 )
-            available_skills = self._restore_execution_profile(
-                execution_profile, task_id, tenant_id,
+            available_skills, pinned_gate = self._restore_execution_profile(
+                stored_reference, task_id, tenant_id, release,
                 effective_roles, requested_skills, scanners,
             )
         else:
-            available_skills = {
-                skill.name: skill
-                for skill in (
-                    list(self.skill_provider(tenant_id)) if self.skill_provider else []
-                )
-            }
-            execution_profile = self._create_execution_profile(
-                task_id, tenant_id, available_skills,
+            available_skills, pinned_gate = self._materialize_release_spec(
+                release["spec"],
                 effective_roles, requested_skills, scanners,
             )
+        execution_profile = release["spec"]
         pinned_identity = execution_profile["runtime_identity"]
         enabled = set(pinned_identity["effective_enabled_roles"])
         requested_skills = list(pinned_identity["requested_skills"])
@@ -972,9 +1134,9 @@ class AgenticReviewer(Reviewer):
         findings, collaboration, components = self._agentic(
             task_id, diff, parsed, suite, ledger, enabled, scanners, memory_context,
             available_skills, requested_skills, session, execution_profile,
-            artifact_scope, source_revision,
+            artifact_scope, source_revision, profile_reference,
         )
-        gated = self.gate.apply(findings, parsed)
+        gated = pinned_gate.apply(findings, parsed)
         ledger.trace("evidence-gate", "completed", **gated.checks)
         self._record_gate_trace(task_id, findings, ledger)
         self._persist_task_memory(
@@ -1077,7 +1239,7 @@ class AgenticReviewer(Reviewer):
         self, task_id, diff, parsed, suite, ledger, enabled, scanners=None,
         memory_context=None, available_skills=None, requested_skills=None,
         session=None, execution_profile=None, artifact_scope=None,
-        source_revision="",
+        source_revision="", execution_profile_reference=None,
     ):
         if "lead" not in enabled:
             raise ValueError("agentic mode requires the lead Agent")
@@ -1110,12 +1272,12 @@ class AgenticReviewer(Reviewer):
                 "worker_execution_snapshots": {},
                 "artifact_refs": {},
                 "logical_issues": None,
-                "execution_profile": execution_profile,
+                "execution_profile": execution_profile_reference,
             }
             # Pin mutable execution configuration before scanner/Lead/Worker
             # execution can depend on it.
             self._save_lead_session(task_id, session, ledger)
-        elif session.get("execution_profile") != execution_profile:
+        elif session.get("execution_profile") != execution_profile_reference:
             raise ExecutionConfigurationError(
                 "loaded execution profile changed during Task resume"
             )

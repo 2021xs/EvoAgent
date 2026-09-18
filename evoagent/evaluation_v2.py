@@ -10,6 +10,7 @@ from .evaluation_harness import EndToEndEvaluationHarness, dataset_fingerprint, 
 from .finding_identity import canonical_identity
 from .llm import JsonChatClient
 from .models import Finding, Severity
+from .releases import ReleaseBundle, ReleaseNotFound
 from .reviewer import LocalRuleReviewer, Reviewer
 from .review_rules import ContextRuleReviewer
 from .skills import AgentSkill
@@ -121,13 +122,28 @@ def validate_real_dataset(cases: List[dict], minimum_cases: int = 300) -> Dict[s
 
 
 class _EvaluationTaskStore:
-    """Minimal task input provider used by AgenticReviewer during replay."""
+    """Minimal task/Release provider used by AgenticReviewer during replay."""
 
     def __init__(self, task_input: dict):
         self.task_input = dict(task_input)
+        self.tasks: Dict[str, dict] = {}
+        self.releases: Dict[str, dict] = {}
 
-    def get(self, _task_id: str, _tenant_id: Optional[str] = None) -> dict:
-        return {"input": dict(self.task_input)}
+    def pin(self, task_id: str, spec: dict) -> None:
+        release = ReleaseBundle.create("default", spec, "evaluation").to_dict()
+        self.releases[release["release_id"]] = release
+        self.tasks[task_id] = {
+            "input": dict(self.task_input), "release_id": release["release_id"],
+        }
+
+    def get(self, task_id: str, _tenant_id: Optional[str] = None) -> dict:
+        return dict(self.tasks.get(task_id) or {"input": dict(self.task_input)})
+
+    def get_release(self, release_id: str, tenant_id: str) -> dict:
+        release = self.releases.get(release_id)
+        if not release or release["tenant_id"] != tenant_id:
+            raise ReleaseNotFound("evaluation Release does not exist")
+        return dict(release)
 
 
 class SingleModelReviewer(Reviewer):
@@ -317,6 +333,12 @@ class ProductArmReviewer:
         self._sequence += 1
         task_id = "evaluation:%s:%d" % (self.arm, self._sequence)
         repository_root = str(case.get("repository_root") or "")
+        skills = {self.evolved_skill.name: self.evolved_skill} if self.evolved_skill else {}
+        self.store.pin(task_id, self.agentic.build_release_spec(
+            skills, self.expected_roles,
+            [self.evolved_skill.name] if self.evolved_skill else [],
+            self.agentic.scanners,
+        ))
         findings = self.agentic.review_with_context(
             task_id, case["diff"], parsed,
             repository=repository_root or str(case.get("repository") or ""),

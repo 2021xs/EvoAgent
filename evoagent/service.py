@@ -1,4 +1,5 @@
 import hashlib
+import copy
 import json
 import uuid
 from typing import Any, Dict, Optional
@@ -213,6 +214,10 @@ class ReviewService:
             self.memory,
             self.context_manager,
             self._active_agent_skills,
+            str(active_prompt["version"]) if active_prompt else "bundled",
+            self.settings.max_steps,
+            self.settings.timeout_seconds,
+            2,
         )
 
     def _run_review(
@@ -221,7 +226,7 @@ class ReviewService:
     ):
         return self.harness.run(task_id, repository, pull_request, diff, tenant_id)
 
-    def reload_skills(self) -> list:
+    def reload_skills(self, tenant_id: str = "default") -> list:
         if self.llm_config:
             active = self.store.get_active_skill_version("llm-review")
             self.registry.register(
@@ -236,7 +241,47 @@ class ReviewService:
             self.store, self.reviewer, self.settings.max_steps, self.settings.timeout_seconds,
             observability=self.observability,
         )
+        parent = self.releases.active(tenant_id)
+        self.releases.publish(
+            tenant_id, self._current_release_spec(tenant_id),
+            parent["release_id"] if parent else "",
+        )
         return skills
+
+    def _current_release_spec(self, tenant_id: str) -> Dict[str, Any]:
+        skills = {skill.name: skill for skill in self._active_agent_skills(tenant_id)}
+        scanners = self.reviewer.scanners + (
+            list(self.reviewer.scanner_provider(tenant_id))
+            if self.reviewer.scanner_provider else []
+        )
+        return self.reviewer.build_release_spec(
+            skills, self.reviewer.enabled_roles, [], scanners,
+        )
+
+    def _pin_release(
+        self, tenant_id: str, enabled_agents: Optional[list],
+        enabled_skills: Optional[list],
+    ) -> dict:
+        active = self.releases.ensure_active(
+            tenant_id, self._current_release_spec(tenant_id),
+        )
+        requested_roles = list(enabled_agents or [])
+        requested_skills = [str(value) for value in (enabled_skills or [])]
+        if not requested_roles and not requested_skills:
+            return active
+        spec = copy.deepcopy(active["spec"])
+        identity = spec["runtime_identity"]
+        if requested_roles:
+            identity["effective_enabled_roles"] = sorted(set(requested_roles))
+        identity["requested_skills"] = requested_skills
+        available = {str(item.get("name")) for item in spec.get("skills") or []}
+        unknown = set(requested_skills).difference(available)
+        if unknown:
+            raise ValueError(
+                "requested Agent Skill is not present in the active Release: %s"
+                % ", ".join(sorted(unknown))
+            )
+        return self.releases.create(tenant_id, spec, active["release_id"])
 
     def _active_agent_skills(self, tenant_id: str) -> list:
         values = {skill.name: skill for skill in self.registry.agent_skills()}
@@ -286,14 +331,16 @@ class ReviewService:
         task_id = str(uuid.uuid4())
         encoded = diff.encode("utf-8")
         assignment = self.releases.assignment(tenant_id, "llm-review", task_id)
+        release = self._pin_release(tenant_id, enabled_agents, enabled_skills)
+        release_identity = release["spec"]["runtime_identity"]
         self.store.create(task_id, repository, pull_request, {
             "source": source, "diff_bytes": len(encoded), "diff_sha256": hashlib.sha256(encoded).hexdigest(),
             "release_lane": assignment["lane"], "shadow": assignment["shadow"],
             "mode": RunMode.AGENTIC.value,
             "repository_root": repository_root,
-            "enabled_agents": enabled_agents or [],
-            "enabled_skills": enabled_skills or [],
-        }, tenant_id)
+            "enabled_agents": release_identity["effective_enabled_roles"],
+            "enabled_skills": release_identity["requested_skills"],
+        }, tenant_id, release["release_id"])
         self.store.save_task_payload(task_id, diff)
         return task_id
 
@@ -303,12 +350,18 @@ class ReviewService:
     ) -> str:
         task_id = str(uuid.uuid4())
         assignment = self.releases.assignment(tenant_id, "llm-review", task_id)
+        release = self._pin_release(
+            tenant_id, payload.get("enabled_agents"), payload.get("enabled_skills"),
+        )
+        release_identity = release["spec"]["runtime_identity"]
         self.store.create(task_id, repository, pull_request, {
             "source": source, "diff_pending": True,
             "release_lane": assignment["lane"], "shadow": assignment["shadow"],
             **payload,
             "mode": RunMode.AGENTIC.value,
-        }, tenant_id)
+            "enabled_agents": release_identity["effective_enabled_roles"],
+            "enabled_skills": release_identity["requested_skills"],
+        }, tenant_id, release["release_id"])
         return task_id
 
     def create_review(
@@ -1196,7 +1249,11 @@ class ReviewService:
             return
         if not all(isinstance(item, str) for item in enabled_skills):
             raise ValueError("enabled_skills must contain Agent Skill names")
-        available = {skill.name for skill in self._active_agent_skills(tenant_id)}
+        active = self.releases.active(tenant_id)
+        available = (
+            {str(item.get("name")) for item in active["spec"].get("skills") or []}
+            if active else {skill.name for skill in self._active_agent_skills(tenant_id)}
+        )
         unknown = set(enabled_skills).difference(available)
         if unknown:
             raise ValueError(

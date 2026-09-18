@@ -3,7 +3,6 @@ import os
 import tempfile
 import unittest
 
-from evoagent.agentic_core import AgenticReviewer
 from evoagent.config import Settings
 from evoagent.diff_parser import parse_unified_diff
 from evoagent.evaluation_v2 import validate_real_dataset
@@ -12,6 +11,7 @@ from evoagent.patching import apply_file_patch, parse_unified_patch
 from evoagent.service import ReviewService
 from evoagent.store import TaskStore
 from evoagent.verifier import RepairVerifier
+from tests.release_fixture import PinnedAgenticReviewer as AgenticReviewer
 
 
 DIFF = "--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-old\n+eval(user_input)\n"

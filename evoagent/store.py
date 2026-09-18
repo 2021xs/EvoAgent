@@ -13,6 +13,7 @@ from .artifacts import (
     MAX_TASK_ARTIFACT_BYTES,
 )
 from .models import ReviewReport, TaskState, TraceEvent
+from .releases import ReleaseBundle, ReleaseNotFound
 
 
 def utc_now() -> str:
@@ -38,6 +39,7 @@ class TaskStore:
                     state TEXT NOT NULL,
                     repository TEXT NOT NULL,
                     pull_request INTEGER,
+                    release_id TEXT NOT NULL DEFAULT '',
                     input_json TEXT NOT NULL,
                     report_json TEXT,
                     error TEXT,
@@ -148,7 +150,37 @@ class TaskStore:
             )
             self._ensure_column(conn, "tasks", "tenant_id", "TEXT NOT NULL DEFAULT 'default'")
             self._ensure_column(conn, "tasks", "cancel_requested", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(conn, "tasks", "release_id", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "installations", "tenant_id", "TEXT NOT NULL DEFAULT 'default'")
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS releases (
+                    release_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    spec_json TEXT NOT NULL,
+                    spec_sha256 TEXT NOT NULL,
+                    parent_release_id TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    UNIQUE(tenant_id, spec_sha256)
+                )"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS active_releases (
+                    tenant_id TEXT PRIMARY KEY,
+                    release_id TEXT NOT NULL,
+                    previous_release_id TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(release_id) REFERENCES releases(release_id)
+                )"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS release_activations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id TEXT NOT NULL,
+                    release_id TEXT NOT NULL,
+                    previous_release_id TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL
+                )"""
+            )
             conn.execute(
                 """CREATE TABLE IF NOT EXISTS checkpoints (
                     task_id TEXT NOT NULL,
@@ -427,17 +459,118 @@ class TaskStore:
 
     def create(
         self, task_id: str, repository: str, pull_request: Optional[int],
-        payload: Dict[str, Any], tenant_id: str = "default",
+        payload: Dict[str, Any], tenant_id: str = "default", release_id: str = "",
     ) -> None:
         now = utc_now()
         with self._lock, self._connect() as conn:
+            if release_id:
+                owner = conn.execute(
+                    "SELECT tenant_id FROM releases WHERE release_id=?", (release_id,)
+                ).fetchone()
+                if not owner or str(owner["tenant_id"]) != str(tenant_id):
+                    raise ReleaseNotFound("Task Release does not exist in the tenant scope")
             conn.execute(
-                "INSERT INTO tasks(id,state,repository,pull_request,input_json,report_json,error,"
-                "created_at,updated_at,tenant_id,cancel_requested) "
-                "VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 0)",
+                "INSERT INTO tasks(id,state,repository,pull_request,release_id,input_json,"
+                "report_json,error,created_at,updated_at,tenant_id,cancel_requested) "
+                "VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 0)",
                 (task_id, TaskState.PENDING.value, repository, pull_request,
-                 json.dumps(payload), now, now, tenant_id),
+                 release_id, json.dumps(payload), now, now, tenant_id),
             )
+
+    @staticmethod
+    def _release_from_row(row) -> Dict[str, Any]:
+        value = dict(row)
+        value["spec"] = json.loads(value.pop("spec_json"))
+        return ReleaseBundle.from_record(value).to_dict()
+
+    def put_release(
+        self, tenant_id: str, spec: Dict[str, Any], parent_release_id: str = "",
+    ) -> Dict[str, Any]:
+        bundle = ReleaseBundle.create(tenant_id, spec, utc_now(), parent_release_id)
+        with self._lock, self._connect() as conn:
+            existing = conn.execute(
+                "SELECT * FROM releases WHERE tenant_id=? AND spec_sha256=?",
+                (bundle.tenant_id, bundle.spec_sha256),
+            ).fetchone()
+            if existing:
+                return self._release_from_row(existing)
+            if bundle.parent_release_id:
+                parent = conn.execute(
+                    "SELECT tenant_id FROM releases WHERE release_id=?",
+                    (bundle.parent_release_id,),
+                ).fetchone()
+                if not parent or str(parent["tenant_id"]) != bundle.tenant_id:
+                    raise ReleaseNotFound("parent Release does not exist in the tenant scope")
+            conn.execute(
+                "INSERT OR IGNORE INTO releases(release_id,tenant_id,spec_json,spec_sha256,"
+                "parent_release_id,created_at) VALUES (?,?,?,?,?,?)",
+                (
+                    bundle.release_id, bundle.tenant_id,
+                    json.dumps(bundle.spec, ensure_ascii=False, sort_keys=True),
+                    bundle.spec_sha256, bundle.parent_release_id, bundle.created_at,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM releases WHERE tenant_id=? AND spec_sha256=?",
+                (bundle.tenant_id, bundle.spec_sha256),
+            ).fetchone()
+        return self._release_from_row(row)
+
+    def get_release(self, release_id: str, tenant_id: str) -> Dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM releases WHERE release_id=? AND tenant_id=?",
+                (release_id, tenant_id),
+            ).fetchone()
+        if not row:
+            raise ReleaseNotFound("Release does not exist in the tenant scope")
+        return self._release_from_row(row)
+
+    def get_active_release(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT r.* FROM active_releases a JOIN releases r "
+                "ON r.release_id=a.release_id WHERE a.tenant_id=?",
+                (tenant_id,),
+            ).fetchone()
+        return self._release_from_row(row) if row else None
+
+    def activate_release(self, tenant_id: str, release_id: str) -> Dict[str, Any]:
+        now = utc_now()
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            target = conn.execute(
+                "SELECT * FROM releases WHERE release_id=? AND tenant_id=?",
+                (release_id, tenant_id),
+            ).fetchone()
+            if not target:
+                raise ReleaseNotFound("Release does not exist in the tenant scope")
+            current = conn.execute(
+                "SELECT release_id FROM active_releases WHERE tenant_id=?", (tenant_id,)
+            ).fetchone()
+            previous = str(current["release_id"]) if current else ""
+            conn.execute(
+                "INSERT INTO active_releases(tenant_id,release_id,previous_release_id,updated_at) "
+                "VALUES (?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET "
+                "release_id=excluded.release_id,previous_release_id=excluded.previous_release_id,"
+                "updated_at=excluded.updated_at",
+                (tenant_id, release_id, previous, now),
+            )
+            if previous != release_id:
+                conn.execute(
+                    "INSERT INTO release_activations(tenant_id,release_id,"
+                    "previous_release_id,created_at) VALUES (?,?,?,?)",
+                    (tenant_id, release_id, previous, now),
+                )
+        return self._release_from_row(target)
+
+    def list_releases(self, tenant_id: str, limit: int = 100) -> list:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM releases WHERE tenant_id=? ORDER BY created_at DESC LIMIT ?",
+                (tenant_id, max(1, min(int(limit), 500))),
+            ).fetchall()
+        return [self._release_from_row(row) for row in rows]
 
     def transition(self, task_id: str, event: TraceEvent) -> None:
         with self._lock, self._connect() as conn:
@@ -585,7 +718,7 @@ class TaskStore:
         with self._connect() as conn:
             if tenant_id is None:
                 rows = conn.execute(
-                    "SELECT id,state,repository,pull_request,error,created_at,updated_at,tenant_id "
+                "SELECT id,state,repository,pull_request,release_id,error,created_at,updated_at,tenant_id "
                     "FROM tasks ORDER BY created_at DESC LIMIT ?", (max(1, min(limit, 200)),)
                 ).fetchall()
             else:

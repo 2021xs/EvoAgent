@@ -1,4 +1,4 @@
-"""Deterministic canary and shadow assignment with automatic rollback."""
+"""Immutable runtime Releases plus legacy canary/shadow bookkeeping."""
 import hashlib
 from typing import Dict, Optional
 
@@ -6,6 +6,38 @@ from typing import Dict, Optional
 class ReleaseManager:
     def __init__(self, store):
         self.store = store
+
+    def create(
+        self, tenant_id: str, spec: Dict[str, object], parent_release_id: str = "",
+    ) -> dict:
+        """Create or reuse one immutable executable ReleaseBundle."""
+        return self.store.put_release(tenant_id, spec, parent_release_id)
+
+    def active(self, tenant_id: str) -> Optional[dict]:
+        return self.store.get_active_release(tenant_id)
+
+    def ensure_active(self, tenant_id: str, initial_spec: Dict[str, object]) -> dict:
+        """Bootstrap one tenant's active Release without replacing an existing pointer."""
+        active = self.active(tenant_id)
+        if active:
+            return active
+        created = self.create(tenant_id, initial_spec)
+        return self.activate(tenant_id, created["release_id"])
+
+    def activate(self, tenant_id: str, release_id: str) -> dict:
+        """Atomically move the active pointer; immutable Releases are never rewritten."""
+        return self.store.activate_release(tenant_id, release_id)
+
+    def publish(
+        self, tenant_id: str, spec: Dict[str, object], parent_release_id: str = "",
+    ) -> dict:
+        """Create/reuse and activate a validated runtime composition."""
+        release = self.create(tenant_id, spec, parent_release_id)
+        return self.activate(tenant_id, release["release_id"])
+
+    def rollback(self, tenant_id: str, release_id: str) -> dict:
+        """Rollback by pointer movement; already-pinned Tasks remain unchanged."""
+        return self.activate(tenant_id, release_id)
 
     def configure(self, tenant_id: str, skill_name: str, config: Dict[str, object]) -> dict:
         canary = int(config.get("canary_percent", 0))

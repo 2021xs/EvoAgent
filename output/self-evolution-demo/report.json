@@ -1,0 +1,354 @@
+{
+  "case": "csv-formula-injection",
+  "claim": "controlled end-to-end architecture validation; not a benchmark",
+  "demo_version": "0.1",
+  "layer": "deterministic",
+  "model": {
+    "model": "csv-formula-gap-v1",
+    "provider": "scripted-demo",
+    "rerun_policy": "one attempt per review/evolution step"
+  },
+  "skill_name": "security-review",
+  "stages": {
+    "after_promotion": {
+      "expected_found": true,
+      "findings": [
+        {
+          "call_chain": [],
+          "confidence": 0.92,
+          "cwe": "CWE-1236",
+          "evidence": "writer.writerow([name, status])",
+          "evidence_refs": [],
+          "explanation": "The raw name can begin with a spreadsheet formula prefix and is written without neutralization.",
+          "fix": "Neutralize dangerous spreadsheet prefixes before writing the cell.",
+          "gate": {
+            "exact_location_evidence": true,
+            "passed": true,
+            "reasons": [],
+            "strong_evidence_count": 0
+          },
+          "line": 3,
+          "path": "export.py",
+          "rule_id": "SEC-CSV-FORMULA-INJECTION",
+          "severity": "medium",
+          "source": "security",
+          "test": "Export =, +, -, and @ prefixes and assert inert cell text.",
+          "title": "Untrusted spreadsheet cell permits formula injection"
+        }
+      ],
+      "task_id": "fd4db22e-38ba-4495-96e4-7dd0ecc3aeb0",
+      "worker_skill": {
+        "content_sha256": "46fd0062d2a4496d68bbdedd592f389589de50c9d67caa2cf07321afccef9b35",
+        "name": "security-review",
+        "source": "evolved-db",
+        "version": "1"
+      }
+    },
+    "attribution": {
+      "assignment_skill": "security-review",
+      "evidence_summary": [
+        "The changed CSV write was present in Worker context.",
+        "The historical Skill did not name spreadsheet formula injection."
+      ],
+      "evolution_surface": "SKILL",
+      "evolution_target": "security-review",
+      "first_divergence": "DISCOVERY",
+      "reason": "Classified from the persisted Worker context and historical guidance.",
+      "root_cause": "SKILL_GUIDANCE_GAP",
+      "status": "SUPPORTED"
+    },
+    "baseline": {
+      "expected_found": false,
+      "findings": [],
+      "task_id": "67a5f52b-3939-4ac7-bb93-0f4b0c901796",
+      "worker_skill": {
+        "content_sha256": "6f1e21a21e73b66657d4b05485be02976eff235a1ecee051cd686efd0de4f82d",
+        "name": "security-review",
+        "source": "disk",
+        "version": "1"
+      }
+    },
+    "evolution": {
+      "baseline": {
+        "case_results": [
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 1,
+            "name": "security-dynamic-execution",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 2,
+            "name": "security-hardcoded-secret",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 3,
+            "name": "reliability-swallowed-error",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 0,
+            "fp": 0,
+            "id": 4,
+            "name": "clean-parameterized-query",
+            "severity_hits": 0,
+            "tp": 0
+          },
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 0,
+            "fp": 0,
+            "id": 5,
+            "name": "clean-input-validation",
+            "severity_hits": 0,
+            "tp": 0
+          },
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 1,
+            "fp": 0,
+            "id": 8,
+            "name": "demo-csv-formula-validation",
+            "severity_hits": 0,
+            "tp": 0
+          }
+        ],
+        "cases": 6,
+        "clean_accuracy": 1.0,
+        "clean_cases": 2,
+        "errors": [],
+        "expected_findings": 4,
+        "f1": 0.8571,
+        "high_severity_recall": 1.0,
+        "positive_cases": 4,
+        "precision": 1.0,
+        "predicted_findings": 3,
+        "recall": 0.75,
+        "reviewer": "security-review-agent-skill-replay",
+        "schema_version": 2,
+        "score": 0.9071,
+        "severity_accuracy": 1.0,
+        "success_rate": 1.0,
+        "successful_cases": 6
+      },
+      "baseline_holdout": {
+        "cases": 3,
+        "clean_accuracy": 1.0,
+        "clean_cases": 2,
+        "expected_findings": 1,
+        "f1": 1.0,
+        "high_severity_recall": 1.0,
+        "positive_cases": 1,
+        "precision": 1.0,
+        "predicted_findings": 1,
+        "recall": 1.0,
+        "reviewer": "security-review-agent-skill-replay",
+        "schema_version": 2,
+        "score": 1.0,
+        "severity_accuracy": 1.0,
+        "success_rate": 1.0,
+        "successful_cases": 3
+      },
+      "candidate": {
+        "case_results": [
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 1,
+            "name": "security-dynamic-execution",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 2,
+            "name": "security-hardcoded-secret",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 3,
+            "name": "reliability-swallowed-error",
+            "severity_hits": 1,
+            "tp": 1
+          },
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 0,
+            "fp": 0,
+            "id": 4,
+            "name": "clean-parameterized-query",
+            "severity_hits": 0,
+            "tp": 0
+          },
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 0,
+            "fp": 0,
+            "id": 5,
+            "name": "clean-input-validation",
+            "severity_hits": 0,
+            "tp": 0
+          },
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": 8,
+            "name": "demo-csv-formula-validation",
+            "severity_hits": 1,
+            "tp": 1
+          }
+        ],
+        "cases": 6,
+        "clean_accuracy": 1.0,
+        "clean_cases": 2,
+        "errors": [],
+        "expected_findings": 4,
+        "f1": 1.0,
+        "high_severity_recall": 1.0,
+        "positive_cases": 4,
+        "precision": 1.0,
+        "predicted_findings": 4,
+        "recall": 1.0,
+        "reviewer": "security-review-agent-skill-replay",
+        "schema_version": 2,
+        "score": 1.0,
+        "severity_accuracy": 1.0,
+        "success_rate": 1.0,
+        "successful_cases": 6
+      },
+      "candidate_holdout": {
+        "cases": 3,
+        "clean_accuracy": 1.0,
+        "clean_cases": 2,
+        "expected_findings": 1,
+        "f1": 1.0,
+        "high_severity_recall": 1.0,
+        "positive_cases": 1,
+        "precision": 1.0,
+        "predicted_findings": 1,
+        "recall": 1.0,
+        "reviewer": "security-review-agent-skill-replay",
+        "schema_version": 2,
+        "score": 1.0,
+        "severity_accuracy": 1.0,
+        "success_rate": 1.0,
+        "successful_cases": 3
+      },
+      "decision": "ready_for_promotion",
+      "gates": {
+        "artifact_valid": true,
+        "evaluation_success": true,
+        "holdout_dataset_ready": true,
+        "holdout_non_regression": true,
+        "model_configured": true,
+        "runtime_is_agent_skill": true,
+        "source_replay_fixed": true,
+        "source_replay_ready": true,
+        "validation_dataset_ready": true,
+        "validation_improvement": true,
+        "validation_non_regression": true
+      },
+      "reason": "candidate SKILL.md fixed the source failure, improved validation, and passed holdout non-regression",
+      "skill_patch": "--- bundled/security-review/SKILL.md\n+++ candidate/security-review/SKILL.md\n@@ -52,3 +52,10 @@\n - Use repository evidence to establish a concrete source-to-sink path or missing authorization condition.\n - Treat a suspicious API alone as a lead, not a finding; report only an exploitable defect introduced by the change.\n - For high-severity findings, cite changed-line evidence plus a call chain or tool evidence.\n+\n+## CSV formula injection\n+\n+When untrusted values are exported to CSV or spreadsheet cells, check whether values beginning\n+with `=`, `+`, `-`, or `@` are neutralized before they reach the writer. Report CWE-1236 only when\n+the changed code writes attacker-controlled cell content without this protection. Require tests\n+that open representative dangerous prefixes as inert text while preserving legitimate values.\n",
+      "source_failure_id": 1,
+      "source_replay": {
+        "baseline": [
+          {
+            "error": null,
+            "findings": 0,
+            "fn": 1,
+            "fp": 0,
+            "id": "source-failure:1",
+            "name": "source-failure:1",
+            "severity_hits": 0,
+            "tp": 0
+          }
+        ],
+        "candidate": [
+          {
+            "error": null,
+            "findings": 1,
+            "fn": 0,
+            "fp": 0,
+            "id": "source-failure:1",
+            "name": "source-failure:1",
+            "severity_hits": 1,
+            "tp": 1
+          }
+        ]
+      },
+      "version": {
+        "active": false,
+        "artifact_sha256": "1dcc0fcd84013e254fa8a3a63269cf01fc490d44c79c991ba2403366c0a3fb92",
+        "created_at": "2026-09-18T02:24:11.466557+00:00",
+        "parent_version": null,
+        "score": 1.0,
+        "skill_name": "security-review",
+        "tenant_id": "default",
+        "version": 1
+      }
+    },
+    "post_rollback": {
+      "expected_found": false,
+      "task_id": "72f0827e-2fd7-47c1-b3a2-ff107091484c",
+      "worker_skill": {
+        "content_sha256": "6f1e21a21e73b66657d4b05485be02976eff235a1ecee051cd686efd0de4f82d",
+        "name": "security-review",
+        "source": "disk",
+        "version": "1"
+      }
+    },
+    "promotion": {
+      "active": true,
+      "artifact_sha256": "1dcc0fcd84013e254fa8a3a63269cf01fc490d44c79c991ba2403366c0a3fb92",
+      "runtime_content_sha256": "46fd0062d2a4496d68bbdedd592f389589de50c9d67caa2cf07321afccef9b35",
+      "source_failure_resolved": 0,
+      "version": 1
+    },
+    "rollback": {
+      "active_db_override": null,
+      "bundled_hash_restored": true,
+      "runtime_skill": {
+        "content_sha256": "6f1e21a21e73b66657d4b05485be02976eff235a1ecee051cd686efd0de4f82d",
+        "name": "security-review",
+        "source": "disk",
+        "version": "1"
+      }
+    }
+  },
+  "status": "SELF_EVOLUTION_MVP_END_TO_END_VALIDATED",
+  "success": true
+}

@@ -1,0 +1,28 @@
+{
+  "name": "csv-formula-injection",
+  "repository": "demo/csv-export",
+  "skill_name": "security-review",
+  "diff": "--- a/export.py\n+++ b/export.py\n@@ -1,2 +1,3 @@\n import csv\n def export_user(writer, name, status):\n+    writer.writerow([name, status])\n",
+  "expected_finding": {
+    "path": "export.py",
+    "line": 3,
+    "rule_id": "SEC-CSV-FORMULA-INJECTION",
+    "cwe": "CWE-1236",
+    "severity": "medium",
+    "title": "Untrusted spreadsheet cell permits formula injection",
+    "explanation": "An attacker-controlled value beginning with =, +, -, or @ can execute as a formula when the exported CSV is opened in spreadsheet software.",
+    "evidence": "writer.writerow([name, status])",
+    "fix": "Neutralize spreadsheet formula prefixes before writing untrusted cell values.",
+    "test": "Export names beginning with =, +, -, and @ and assert that every cell is rendered as inert text."
+  },
+  "validation": {
+    "name": "demo-csv-formula-validation",
+    "split": "validation"
+  },
+  "holdout": {
+    "name": "demo-clean-sanitized-csv-holdout",
+    "split": "holdout",
+    "diff": "--- a/export.py\n+++ b/export.py\n@@ -1,2 +1,3 @@\n import csv\n def export_user(writer, name, status):\n+    writer.writerow([sanitize_spreadsheet_cell(name), status])\n",
+    "expected": []
+  }
+}

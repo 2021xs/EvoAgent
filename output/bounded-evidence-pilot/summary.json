@@ -1,0 +1,63 @@
+{
+  "arms": {
+    "bounded": {
+      "cases": 10,
+      "challenge_trigger_rate": 0.7,
+      "final_critic_verdict_accuracy": 1.0,
+      "llm": {
+        "input_tokens": null,
+        "latency_ms": null,
+        "llm_calls": 61,
+        "output_tokens": null,
+        "total_tokens": null
+      },
+      "unnecessary_challenge_rate": 0.0,
+      "unnecessary_challenges": 0,
+      "useful_challenge_rate": 1.0,
+      "useful_challenges": 7,
+      "verdict_correction_rate": 1.0,
+      "verdict_corrections": 7
+    },
+    "one_shot": {
+      "cases": 10,
+      "challenge_trigger_rate": 0.0,
+      "final_critic_verdict_accuracy": 0.3,
+      "llm": {
+        "input_tokens": null,
+        "latency_ms": null,
+        "llm_calls": 40,
+        "output_tokens": null,
+        "total_tokens": null
+      },
+      "unnecessary_challenge_rate": 0.0,
+      "unnecessary_challenges": 0,
+      "useful_challenge_rate": null,
+      "useful_challenges": 0,
+      "verdict_correction_rate": null,
+      "verdict_corrections": 0
+    }
+  },
+  "case_count": 10,
+  "case_distribution": {
+    "counter_evidence": 3,
+    "missing_support": 4,
+    "sufficient": 3
+  },
+  "comparison": {
+    "downstream_equivalent": true,
+    "downstream_mismatches": [],
+    "extra_input_tokens": null,
+    "extra_latency_ms": null,
+    "extra_llm_calls": 21,
+    "extra_output_tokens": null,
+    "extra_total_tokens": null
+  },
+  "errors": [],
+  "experiment": "bounded-evidence-pilot",
+  "interpretation": "PROTOCOL_EXPERIMENT_PLUMBING_VALIDATION",
+  "mode": "deterministic-protocol-dry-run",
+  "real_model_results": {
+    "note": "Scripted results are not substituted for real-model evidence.",
+    "status": "UNKNOWN / NOT RUN"
+  }
+}

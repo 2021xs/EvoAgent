@@ -1,0 +1,77 @@
+{
+  "arms": {
+    "naive": {
+      "attribution_accuracy": 1.0,
+      "cases": 12,
+      "evolution_attempts": 12,
+      "llm": {
+        "calls": 552,
+        "calls_with_unavailable_tokens": 0,
+        "input_tokens": null,
+        "latency_ms": null,
+        "output_tokens": null,
+        "total_tokens": null
+      },
+      "regression_rejection_rate": 0.0833,
+      "regression_rejections": 1,
+      "routing_accuracy": 0.3333,
+      "source_failure_resolution_rate": 0.3333,
+      "source_failures_resolved": 4,
+      "validated_evolution_rate": 0.25,
+      "validated_evolutions": 3,
+      "wrong_surface_evolution_rate": 1.0,
+      "wrong_surface_evolutions": 8
+    },
+    "targeted": {
+      "attribution_accuracy": 1.0,
+      "cases": 12,
+      "evolution_attempts": 4,
+      "llm": {
+        "calls": 464,
+        "calls_with_unavailable_tokens": 0,
+        "input_tokens": null,
+        "latency_ms": null,
+        "output_tokens": null,
+        "total_tokens": null
+      },
+      "regression_rejection_rate": 0.25,
+      "regression_rejections": 1,
+      "routing_accuracy": 1.0,
+      "source_failure_resolution_rate": 1.0,
+      "source_failures_resolved": 4,
+      "validated_evolution_rate": 0.75,
+      "validated_evolutions": 3,
+      "wrong_surface_evolution_rate": 0.0,
+      "wrong_surface_evolutions": 0
+    }
+  },
+  "case_count": 12,
+  "case_distribution": {
+    "CONTEXT_EVIDENCE_MISSING": 3,
+    "INSUFFICIENT_EVIDENCE": 2,
+    "MODEL_REASONING_FAILURE": 3,
+    "SKILL_GUIDANCE_GAP": 4
+  },
+  "development_gates": {
+    "skill_gap_attribution_at_least_3_of_4": true,
+    "targeted_non_skill_wrong_evolution_at_most_1_of_8": true,
+    "validated_at_least_half_of_routed_skill_gaps": true
+  },
+  "development_gates_passed": true,
+  "downstream_contract": {
+    "activation_policy": "ready_for_promotion",
+    "candidate_count": 1,
+    "evaluation": "SkillEvolutionEngine._propose",
+    "generator": "SkillPatchGenerator",
+    "source_replay": "SkillEvolutionEngine._source_failure_evidence"
+  },
+  "downstream_contract_sha256": "9db51b9c4542b12f889d603393b58988fbb9ff2a6b6bfff310affa15c36c0793",
+  "errors": [],
+  "experiment": "targeted-evolution-pilot",
+  "interpretation": "PIPELINE_VALIDATION_NOT_MODEL_INTELLIGENCE",
+  "mode": "deterministic-protocol-dry-run",
+  "real_model_results": {
+    "note": "No scripted result is substituted.",
+    "status": "UNKNOWN / NOT RUN"
+  }
+}

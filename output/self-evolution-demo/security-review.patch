@@ -1,0 +1,13 @@
+--- bundled/security-review/SKILL.md
++++ candidate/security-review/SKILL.md
+@@ -52,3 +52,10 @@
+ - Use repository evidence to establish a concrete source-to-sink path or missing authorization condition.
+ - Treat a suspicious API alone as a lead, not a finding; report only an exploitable defect introduced by the change.
+ - For high-severity findings, cite changed-line evidence plus a call chain or tool evidence.
++
++## CSV formula injection
++
++When untrusted values are exported to CSV or spreadsheet cells, check whether values beginning
++with `=`, `+`, `-`, or `@` are neutralized before they reach the writer. Report CWE-1236 only when
++the changed code writes attacker-controlled cell content without this protection. Require tests
++that open representative dangerous prefixes as inert text while preserving legitimate values.

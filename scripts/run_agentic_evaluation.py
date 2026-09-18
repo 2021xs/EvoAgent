@@ -38,7 +38,7 @@ def main():
             "agentic review with an evolved Skill."
         )
     )
-    parser.add_argument("dataset", help="Human-labelled public/historical PR JSONL")
+    parser.add_argument("dataset", help="Evidence-adjudicated public/historical PR JSONL")
     parser.add_argument("--base-url", default=os.getenv("EVOAGENT_LLM_BASE_URL", ""))
     parser.add_argument("--api-key", default=os.getenv("EVOAGENT_LLM_API_KEY", ""))
     parser.add_argument("--model", default=os.getenv("EVOAGENT_LLM_MODEL", ""))

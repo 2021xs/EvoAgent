@@ -38,7 +38,7 @@ def main() -> None:
             "using train feedback, validation selection and a locked holdout."
         )
     )
-    parser.add_argument("dataset", help="Human-labelled public/historical PR JSONL")
+    parser.add_argument("dataset", help="Evidence-adjudicated public/historical PR JSONL")
     parser.add_argument("--static-skill", default="")
     parser.add_argument("--skill-name", default="evolved-review")
     parser.add_argument("--base-url", default=os.getenv("EVOAGENT_LLM_BASE_URL", ""))

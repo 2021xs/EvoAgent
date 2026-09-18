@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "dataset_id": "evidence-adjudicated-historical-pr-benchmark",
+  "dataset_version": "0.0.0-protocol-dry-run",
+  "annotation_version": "evidence-adjudication-guide-v1",
+  "case_id": "REPLACE_ME",
+  "repository_id": "owner/repository@stable-id",
+  "source": {"kind": "public-github-pr", "reference_id": "owner/repository#123", "url": null},
+  "base_sha": "REPLACE_WITH_40_OR_64_HEX",
+  "head_sha": "REPLACE_WITH_40_OR_64_HEX",
+  "diff_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
+  "captured_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "split": "validation",
+  "protocol_dry_run": true,
+  "related_cases": [],
+  "diff": "REPLACE_WITH_FROZEN_DIFF",
+  "annotators": [
+    {
+      "annotator_id": "annotator-a", "annotator_kind": "MODEL", "role": "FIRST_PASS",
+      "provider": "REPLACE_ME", "model": "REPLACE_ME", "model_revision": "REPLACE_ME",
+      "prompt_version": "evidence-adjudication-guide-v1", "prompt_hash": "REPLACE_ME",
+      "context_policy_id": "frozen-repository-read-only-v1", "context_policy_hash": "REPLACE_ME",
+      "tool_policy_id": "read-only-repository-tools-v1", "tool_policy_hash": "REPLACE_ME",
+      "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY", "run_id": "REPLACE_ME",
+      "started_at": "YYYY-MM-DDTHH:MM:SSZ", "completed_at": "YYYY-MM-DDTHH:MM:SSZ",
+      "blindness": {"evoagent_prediction_visible": false, "experiment_arm_visible": false, "peer_annotation_visible": false, "production_attribution_visible": false}
+    }
+  ],
+  "findings": [],
+  "case_annotation_status": "NEEDS_MORE_CONTEXT",
+  "reviewer_records": [{"annotator_id": "annotator-a", "completed_review": true, "duration_seconds": 0, "submitted_at": "YYYY-MM-DDTHH:MM:SSZ"}],
+  "clean_review": {"completed": false, "no_commentable_findings_remain": false, "rationale": "Not yet adjudicated.", "gold_evidence_level": "QUARANTINED", "objective_evidence": null}
+}

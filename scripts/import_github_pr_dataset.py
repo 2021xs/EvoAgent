@@ -56,12 +56,12 @@ def main():
             item = json.loads(raw)
             if "expected_findings" not in item:
                 raise ValueError(
-                    "manifest line %d has no human-reviewed expected_findings"
+                    "manifest line %d has no evidence-adjudicated expected_findings"
                     % line_number
                 )
             if any("should_comment" not in finding for finding in item["expected_findings"]):
                 raise ValueError(
-                    "manifest line %d has a finding without human should_comment label"
+                    "manifest line %d has a finding without an adjudicated should_comment label"
                     % line_number
                 )
             diff, _api_url = fetch_diff(

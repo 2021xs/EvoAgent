@@ -347,7 +347,7 @@ class EvolutionEngine:
 
     def _propose(
         self, skill_name: str, prompt: str, regression_score: Optional[float],
-        activation_policy: str = "auto",
+        activation_policy: str = "auto", materialize: bool = True,
     ) -> Dict[str, Any]:
         safety = self.safety_evaluate(prompt)
         active = self.store.get_active_skill_version(skill_name)
@@ -417,7 +417,11 @@ class EvolutionEngine:
                 "holdout_non_regression": holdout_safe,
             })
             if no_errors and improved and validation_safe and holdout_safe:
-                decision = "activated" if activation_policy == "auto" else "shadow_ready"
+                decision = (
+                    "activated" if activation_policy == "auto" else
+                    "ready_for_promotion" if activation_policy == "ready_for_promotion" else
+                    "shadow_ready"
+                )
                 reason = (
                     "candidate improved on validation and passed the non-regression holdout gate"
                     if decision == "activated" else
@@ -436,13 +440,15 @@ class EvolutionEngine:
                     reasons.append("a protected holdout metric regressed")
                 reason = "; ".join(reasons)
 
-        version = self.store.save_skill_version(
-            skill_name, prompt.strip(), candidate_metrics["score"], decision == "activated"
+        version = (
+            self.store.save_skill_version(
+                skill_name, prompt.strip(), candidate_metrics["score"], decision == "activated"
+            ) if materialize else None
         )
         run = {
             "id": str(uuid.uuid4()),
             "skill_name": skill_name,
-            "candidate_version": version["version"],
+            "candidate_version": version["version"] if version else None,
             "baseline_version": active["version"] if active else None,
             "decision": decision,
             "candidate_score": candidate_metrics["score"],
@@ -468,7 +474,8 @@ class EvolutionEngine:
             },
             "created_at": utc_now(),
         }
-        self.store.save_evolution_run(run)
+        if materialize:
+            self.store.save_evolution_run(run)
         return {
             "version": version,
             "decision": decision,
@@ -479,8 +486,15 @@ class EvolutionEngine:
             "baseline_holdout": self._redact_holdout_metrics(baseline_holdout),
             "safety": safety,
             "gates": gates,
-            "run_id": run["id"],
+            "run_id": run["id"] if materialize else None,
         }
+
+    def evaluate_candidate(self, prompt: str) -> Dict[str, Any]:
+        """Evaluate one persisted candidate without creating or activating a PromptVersion."""
+        return self._propose(
+            "llm-review", prompt, None,
+            activation_policy="ready_for_promotion", materialize=False,
+        )
 
     def rollback(self, skill_name: str, version: int) -> bool:
         with self._lock:

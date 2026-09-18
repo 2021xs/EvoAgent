@@ -300,6 +300,11 @@ class ServiceTests(unittest.TestCase):
         attribution = self._record_missed_issue(service, task_id)
 
         self.assertEqual("LEAD_FINAL", attribution["first_divergence"])
+        failure = service.store.list_task_failure_cases(task_id, "default")[0]
+        persisted = service.store.get_failure_attribution(failure["id"])
+        self.assertEqual("SUPPORTED", persisted["status"])
+        self.assertEqual("LEAD_FINAL", persisted["failure_layer"])
+        self.assertEqual("NO_SUPPORTED_EVOLUTION", persisted["target_surface"])
 
     def test_critic_reject_is_advisory_and_gate_is_first_divergence(self):
         service, task_id = self._completed_task()
@@ -320,6 +325,11 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual("GATE", attribution["first_divergence"])
         self.assertEqual([reason], attribution["gate_reasons"])
         self.assertNotIn("CRITIC", json.dumps(attribution))
+        failure = service.store.list_task_failure_cases(task_id, "default")[0]
+        persisted = service.store.get_failure_attribution(failure["id"])
+        self.assertEqual("SUPPORTED", persisted["status"])
+        self.assertEqual("GATE", persisted["failure_layer"])
+        self.assertEqual("NO_SUPPORTED_EVOLUTION", persisted["target_surface"])
 
     def test_published_candidate_missed_issue_is_unknown(self):
         service, task_id = self._completed_task()

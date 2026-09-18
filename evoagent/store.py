@@ -14,6 +14,7 @@ from .artifacts import (
 )
 from .models import ReviewReport, TaskState, TraceEvent
 from .releases import ReleaseBundle, ReleaseNotFound
+from .evolution_lifecycle import CANDIDATE_TRANSITIONS
 from .workflow_events import (
     AUTOFIX_CHECKPOINT,
     CI_TERMINAL_PHASES,
@@ -62,6 +63,52 @@ class TaskStore:
                     payload_json TEXT NOT NULL,
                     resolved INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL
+                )"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS attribution_results (
+                    attribution_id TEXT PRIMARY KEY,
+                    failure_id INTEGER NOT NULL UNIQUE,
+                    task_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    failure_layer TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    semantic_cause TEXT NOT NULL,
+                    target_surface TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    evidence_refs_json TEXT NOT NULL,
+                    alternative_hypotheses_json TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(failure_id) REFERENCES failure_cases(id),
+                    FOREIGN KEY(task_id) REFERENCES tasks(id)
+                )"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS evolution_candidates (
+                    candidate_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    surface TEXT NOT NULL,
+                    target_id TEXT NOT NULL,
+                    parent_version INTEGER,
+                    parent_release_id TEXT NOT NULL,
+                    attribution_id TEXT NOT NULL,
+                    source_failure_ids_json TEXT NOT NULL,
+                    evidence_refs_json TEXT NOT NULL,
+                    change_json TEXT NOT NULL,
+                    change_hash TEXT NOT NULL,
+                    generation_method TEXT NOT NULL,
+                    generation_model TEXT NOT NULL,
+                    generation_config_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    validation_result_json TEXT NOT NULL,
+                    final_evaluation_result_json TEXT NOT NULL,
+                    surface_version_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(tenant_id,surface,target_id,parent_version,change_hash),
+                    FOREIGN KEY(attribution_id) REFERENCES attribution_results(attribution_id)
                 )"""
             )
             conn.execute(
@@ -790,12 +837,182 @@ class TaskStore:
                 ).fetchall()
         return [dict(item) for item in rows]
 
-    def record_failure_case(self, task_id: str, category: str, payload: Dict[str, Any]) -> None:
+    def record_failure_case(self, task_id: str, category: str, payload: Dict[str, Any]) -> int:
         with self._lock, self._connect() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT INTO failure_cases(task_id, category, payload_json, created_at) VALUES (?, ?, ?, ?)",
                 (task_id, category, json.dumps(payload, ensure_ascii=False), utc_now()),
             )
+            return int(cursor.lastrowid)
+
+    def get_failure_case(
+        self, failure_id: int, tenant_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        query = "SELECT f.* FROM failure_cases f"
+        params = [int(failure_id)]
+        if tenant_id is not None:
+            query += " JOIN tasks t ON t.id=f.task_id WHERE f.id=? AND t.tenant_id=?"
+            params.append(tenant_id)
+        else:
+            query += " WHERE f.id=?"
+        with self._connect() as conn:
+            row = conn.execute(query, params).fetchone()
+        if not row:
+            return None
+        value = dict(row)
+        value["payload"] = json.loads(value.pop("payload_json"))
+        return value
+
+    def save_attribution_result(self, value: Dict[str, Any]) -> Dict[str, Any]:
+        with self._lock, self._connect() as conn:
+            failure = conn.execute(
+                "SELECT task_id FROM failure_cases WHERE id=?", (int(value["failure_id"]),),
+            ).fetchone()
+            if not failure or str(failure["task_id"]) != str(value["task_id"]):
+                raise ValueError("AttributionResult failure/task provenance mismatch")
+            conn.execute(
+                "INSERT INTO attribution_results(attribution_id,failure_id,task_id,status,"
+                "failure_layer,actor,semantic_cause,target_surface,target_id,evidence_refs_json,"
+                "alternative_hypotheses_json,method,reason,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    value["attribution_id"], int(value["failure_id"]), value["task_id"],
+                    value["status"], value["failure_layer"], value["actor"],
+                    value["semantic_cause"], value["target_surface"], value["target_id"],
+                    json.dumps(value.get("evidence_refs") or [], ensure_ascii=False),
+                    json.dumps(value.get("alternative_hypotheses") or [], ensure_ascii=False),
+                    value["method"], value["reason"], value["created_at"],
+                ),
+            )
+        return self.get_attribution_result(value["attribution_id"])
+
+    @staticmethod
+    def _decode_attribution(row) -> Dict[str, Any]:
+        value = dict(row)
+        value["evidence_refs"] = json.loads(value.pop("evidence_refs_json"))
+        value["alternative_hypotheses"] = json.loads(
+            value.pop("alternative_hypotheses_json")
+        )
+        return value
+
+    def get_attribution_result(self, attribution_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM attribution_results WHERE attribution_id=?", (attribution_id,),
+            ).fetchone()
+        return self._decode_attribution(row) if row else None
+
+    def get_failure_attribution(self, failure_id: int) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM attribution_results WHERE failure_id=?", (int(failure_id),),
+            ).fetchone()
+        return self._decode_attribution(row) if row else None
+
+    @staticmethod
+    def _decode_evolution_candidate(row) -> Dict[str, Any]:
+        value = dict(row)
+        for key in (
+            "source_failure_ids", "evidence_refs", "change", "generation_config",
+            "validation_result", "final_evaluation_result", "surface_version",
+        ):
+            value[key] = json.loads(value.pop(key + "_json"))
+        return value
+
+    def put_evolution_candidate(self, value: Dict[str, Any]) -> Dict[str, Any]:
+        with self._lock, self._connect() as conn:
+            provenance = conn.execute(
+                "SELECT a.failure_id,t.tenant_id FROM attribution_results a "
+                "JOIN tasks t ON t.id=a.task_id WHERE a.attribution_id=?",
+                (value["attribution_id"],),
+            ).fetchone()
+            if not provenance or str(provenance["tenant_id"]) != str(value["tenant_id"]):
+                raise ValueError("EvolutionCandidate attribution is outside its tenant scope")
+            if int(provenance["failure_id"]) not in {
+                int(item) for item in value.get("source_failure_ids") or []
+            }:
+                raise ValueError("EvolutionCandidate omits its attributed source failure")
+            conn.execute(
+                "INSERT OR IGNORE INTO evolution_candidates(candidate_id,tenant_id,surface,"
+                "target_id,parent_version,parent_release_id,attribution_id,source_failure_ids_json,"
+                "evidence_refs_json,change_json,change_hash,generation_method,generation_model,"
+                "generation_config_json,status,validation_result_json,final_evaluation_result_json,"
+                "surface_version_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    value["candidate_id"], value["tenant_id"], value["surface"], value["target_id"],
+                    value.get("parent_version"), value.get("parent_release_id", ""),
+                    value["attribution_id"], json.dumps(value.get("source_failure_ids") or []),
+                    json.dumps(value.get("evidence_refs") or [], ensure_ascii=False),
+                    json.dumps(value.get("change"), ensure_ascii=False, sort_keys=True),
+                    value["change_hash"], value["generation_method"], value["generation_model"],
+                    json.dumps(value.get("generation_config") or {}, ensure_ascii=False),
+                    value["status"], json.dumps(value.get("validation_result") or {}),
+                    json.dumps(value.get("final_evaluation_result") or {}),
+                    json.dumps(value.get("surface_version") or {}),
+                    value["created_at"], value["updated_at"],
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE tenant_id=? AND surface=? "
+                "AND target_id=? AND parent_version IS ? AND change_hash=?",
+                (value["tenant_id"], value["surface"], value["target_id"],
+                 value.get("parent_version"), value["change_hash"]),
+            ).fetchone()
+        return self._decode_evolution_candidate(row)
+
+    def get_evolution_candidate(self, candidate_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE candidate_id=?", (candidate_id,),
+            ).fetchone()
+        return self._decode_evolution_candidate(row) if row else None
+
+    def list_evolution_candidates(
+        self, tenant_id: str, limit: int = 100,
+    ) -> list:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE tenant_id=? "
+                "ORDER BY created_at DESC LIMIT ?", (tenant_id, max(1, min(limit, 500))),
+            ).fetchall()
+        return [self._decode_evolution_candidate(row) for row in rows]
+
+    def transition_evolution_candidate(
+        self, candidate_id: str, target: str, updates: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE candidate_id=?", (candidate_id,),
+            ).fetchone()
+            if not row:
+                raise ValueError("evolution candidate not found")
+            current = str(row["status"])
+            if target not in CANDIDATE_TRANSITIONS.get(current, set()):
+                raise ValueError("illegal evolution candidate transition: %s -> %s" % (current, target))
+            existing = self._decode_evolution_candidate(row)
+            fields = {
+                "status": target,
+                "validation_result_json": json.dumps(
+                    updates.get("validation_result", existing["validation_result"])
+                ),
+                "final_evaluation_result_json": json.dumps(
+                    updates.get("final_evaluation_result", existing["final_evaluation_result"])
+                ),
+                "surface_version_json": json.dumps(
+                    updates.get("surface_version", existing["surface_version"])
+                ),
+                "updated_at": utc_now(),
+            }
+            conn.execute(
+                "UPDATE evolution_candidates SET status=?,validation_result_json=?,"
+                "final_evaluation_result_json=?,surface_version_json=?,updated_at=? "
+                "WHERE candidate_id=?",
+                (*fields.values(), candidate_id),
+            )
+            updated = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE candidate_id=?", (candidate_id,),
+            ).fetchone()
+        return self._decode_evolution_candidate(updated)
 
     def list_failure_cases(
         self, unresolved_only: bool = False, limit: int = 100,
@@ -982,7 +1199,11 @@ class TaskStore:
     def activate_skill_version(self, skill_name: str, version: int) -> bool:
         with self._lock, self._connect() as conn:
             exists = conn.execute(
-                "SELECT 1 FROM skill_versions WHERE skill_name = ? AND version = ?", (skill_name, version)
+                "SELECT 1 FROM skill_versions v WHERE v.skill_name=? AND v.version=? "
+                "AND (v.active=1 OR EXISTS (SELECT 1 FROM evolution_runs r "
+                "WHERE r.skill_name=v.skill_name AND r.candidate_version=v.version "
+                "AND r.decision IN ('activated','shadow_ready','ready_for_promotion')))",
+                (skill_name, version),
             ).fetchone()
             if not exists:
                 return False

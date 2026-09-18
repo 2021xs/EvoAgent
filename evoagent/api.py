@@ -31,6 +31,12 @@ SKILL_ARTIFACT_ACTIVATE = re.compile(
 SKILL_ARTIFACT_FALLBACK = re.compile(
     r"^/v1/skill-evolution/([a-z0-9_-]+)/fallback$"
 )
+EVOLUTION_CANDIDATE_EVALUATE = re.compile(
+    r"^/v1/evolution/candidates/([a-z0-9-]+)/evaluate$"
+)
+EVOLUTION_CANDIDATE_PROMOTE = re.compile(
+    r"^/v1/evolution/candidates/([a-z0-9-]+)/promote$"
+)
 WEB_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "web"))
 
 
@@ -229,6 +235,14 @@ class ApiHandler(BaseHTTPRequestHandler):
             status["provider"] = self.service.llm_config.get("provider", "local")
             status["model"] = self.service.llm_config.get("model", "")
             self._send_json(200, status)
+            return
+        if path == "/v1/evolution/candidates":
+            if not principal.can("manage"):
+                self._send_json(403, {"error": "permission denied"})
+                return
+            self._send_json(200, {"candidates": self.service.store.list_evolution_candidates(
+                principal.tenant_id, int(query.get("limit", [100])[0])
+            )})
             return
         if path == "/v1/skill-evolution/status":
             if not principal.can("manage"):
@@ -492,11 +506,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/v1/evolution/auto":
                 principal = self._principal("manage")
                 payload = self._read_json(body)
-                result = self.service.evolution.auto_propose(
-                    str(payload.get("skill_name", "llm-review")), principal.tenant_id
+                if "skill_name" in payload or "surface" in payload:
+                    raise ValueError(
+                        "automatic evolution surface is selected by AttributionResult, not the caller"
+                    )
+                result = self.service.generate_evolution_candidate(
+                    int(payload.get("failure_id", 0)), principal.tenant_id,
                 )
-                if result["decision"] == "activated":
-                    self.service.reload_skills(principal.tenant_id)
                 self._send_json(201, result)
                 return
             if path == "/v1/evolution/propose":
@@ -511,19 +527,29 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send_json(201, result)
                 return
             if path == "/v1/skill-evolution/auto":
+                self._principal("manage")
+                self._send_json(409, {
+                    "error": "use /v1/evolution/auto with failure_id; callers cannot select the automatic surface"
+                })
+                return
+            match = EVOLUTION_CANDIDATE_EVALUATE.match(path)
+            if match:
                 principal = self._principal("manage")
-                payload = self._read_json(body)
-                result = self.service.skill_evolution.auto_propose(
-                    str(payload.get("skill_name", "evolved-review")), principal.tenant_id
+                self._send_json(200, self.service.evaluate_evolution_candidate(
+                    match.group(1), principal.tenant_id,
+                ))
+                return
+            match = EVOLUTION_CANDIDATE_PROMOTE.match(path)
+            if match:
+                principal = self._principal("manage")
+                result = self.service.promote_evolution_candidate(
+                    match.group(1), principal.tenant_id,
                 )
-                if result["decision"] == "activated":
-                    self.service.reload_skills(principal.tenant_id)
                 self.service.store.audit(
-                    principal.tenant_id, principal.username, "skill.evolution.auto",
-                    str(payload.get("skill_name", "evolved-review")),
-                    {"decision": result["decision"], "run_id": result.get("run_id")},
+                    principal.tenant_id, principal.username, "evolution.candidate.promote",
+                    match.group(1), {"status": result["status"]},
                 )
-                self._send_json(201, result)
+                self._send_json(200, result)
                 return
             if path == "/v1/skill-evolution/propose":
                 principal = self._principal("manage")

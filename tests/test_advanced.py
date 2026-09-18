@@ -72,7 +72,7 @@ class AdvancedFeatureTests(unittest.TestCase):
         self.assertEqual("deferred", result["decision"])
         self.assertEqual(1, result["failure_cases_used"])
         version = result["version"]["version"]
-        self.assertTrue(engine.rollback("llm-review", version))
+        self.assertFalse(engine.rollback("llm-review", version))
 
     def test_auto_evolution_uses_only_the_requested_tenant_feedback(self):
         store = TaskStore(self.path)

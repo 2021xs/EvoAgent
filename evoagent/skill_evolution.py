@@ -368,7 +368,7 @@ class SkillEvolutionEngine:
         self, skill_name: str, artifact: dict, tenant_id: str,
         baseline_artifact_override: Optional[dict] = None,
         activation_policy: str = "auto", source_case: Optional[dict] = None,
-        provenance: Optional[dict] = None,
+        provenance: Optional[dict] = None, materialize: bool = True,
     ) -> dict:
         active = self.store.get_active_skill_artifact(skill_name, tenant_id)
         baseline_artifact = (
@@ -481,14 +481,16 @@ class SkillEvolutionEngine:
                     if not holdout_safe:
                         failures.append("a protected holdout metric regressed")
                     reason = "; ".join(failures)
-        version = self.store.save_skill_artifact(
-            skill_name, artifact, candidate_metrics.get("score", 0.0),
-            decision == "activated", tenant_id,
+        version = (
+            self.store.save_skill_artifact(
+                skill_name, artifact, candidate_metrics.get("score", 0.0),
+                decision == "activated", tenant_id,
+            ) if materialize else None
         )
         candidate_change = self._skill_diff(baseline_artifact, artifact)
         run = {
             "id": str(uuid.uuid4()), "tenant_id": tenant_id, "skill_name": skill_name,
-            "candidate_version": version["version"],
+            "candidate_version": version["version"] if version else None,
             "baseline_version": active.get("version") if active else None,
             "decision": decision, "candidate_score": candidate_metrics.get("score", 0.0),
             "baseline_score": baseline_metrics.get("score", 0.0), "created_at": utc_now(),
@@ -502,21 +504,37 @@ class SkillEvolutionEngine:
                 "provenance": dict(provenance or {}),
                 "reproducibility": {
                     "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
-                    "candidate_artifact_sha256": version["artifact_sha256"],
+                    "candidate_artifact_sha256": (
+                        version["artifact_sha256"] if version else _sha256(artifact)
+                    ),
                     "baseline_artifact_sha256": active.get("artifact_sha256")
                     if active else _sha256(baseline_artifact),
                 },
             },
         }
-        self.store.save_skill_evolution_run(run)
+        if materialize:
+            self.store.save_skill_evolution_run(run)
         return {
             "version": version, "decision": decision, "reason": reason,
             "candidate": candidate_metrics, "baseline": baseline_metrics,
             "candidate_holdout": self._redact_holdout(candidate_holdout),
             "baseline_holdout": self._redact_holdout(baseline_holdout),
             "source_baseline": source_baseline, "source_candidate": source_candidate,
-            "gates": gates, "run_id": run["id"], "candidate_change": candidate_change,
+            "gates": gates, "run_id": run["id"] if materialize else None,
+            "candidate_change": candidate_change,
         }
+
+    def evaluate_candidate(
+        self, skill_name: str, artifact: dict, tenant_id: str,
+        baseline_artifact: dict, source_case: Optional[dict],
+    ) -> dict:
+        """Evaluate one persisted candidate without creating or activating a SkillVersion."""
+        return self._propose(
+            skill_name, validate_artifact(artifact, skill_name), tenant_id,
+            baseline_artifact_override=baseline_artifact,
+            activation_policy="ready_for_promotion", source_case=source_case,
+            materialize=False,
+        )
 
     def auto_propose(
         self, skill_name: str = "evolved-review", tenant_id: Optional[str] = None,

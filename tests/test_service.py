@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 from evoagent.config import Settings
-from evoagent.agentic_core import capture_tool_evidence_artifact
+from evoagent.artifacts import Artifact, ArtifactScope
 from evoagent.models import Finding, Severity
 from evoagent.report import to_markdown
 from evoagent.service import ReviewService
@@ -79,11 +79,11 @@ class ServiceTests(unittest.TestCase):
     def _save_lead_session(
         service, task_id, trace, findings=None, delegations=None,
         worker_execution_snapshots=None, worker_results=None,
-        revision_results=None, evidence_artifacts=None,
+        revision_results=None, artifact_refs=None,
     ):
         service.store.save_checkpoint(
             task_id, "agentic-lead-session", {
-                "protocol": "lead-workers-v3",
+                "protocol": "lead-workers-v4",
                 "session": {
                     "candidate_trace": trace,
                     "scanner_findings": list(findings or []),
@@ -94,7 +94,7 @@ class ServiceTests(unittest.TestCase):
                     "worker_execution_snapshots": dict(
                         worker_execution_snapshots or {}
                     ),
-                    "evidence_artifacts": dict(evidence_artifacts or {}),
+                    "artifact_refs": dict(artifact_refs or {}),
                 },
             }, "completed", 1,
         )
@@ -428,22 +428,20 @@ class ServiceTests(unittest.TestCase):
         self._save_discovery_evidence(service, task_id)
         checkpoint = service.store.load_checkpoints(task_id)["agentic-lead-session"]
         session = checkpoint["state"]["session"]
-        artifacts = {}
-        capture_tool_evidence_artifact(
-            task_id, artifacts,
-            {"role": "security", "run_id": "security-1", "step": 1,
-             "tool": "read_file"},
-            {"evidence_id": "relevant-evidence", "tool": "read_file",
-             "output": "historical relevant repository fact"},
-        )
-        capture_tool_evidence_artifact(
-            task_id, artifacts,
-            {"role": "correctness-reliability", "run_id": "other-run",
-             "step": 1, "tool": "read_file"},
-            {"evidence_id": "unrelated-evidence", "tool": "read_file",
-             "output": "must not enter attribution"},
-        )
-        session["evidence_artifacts"] = artifacts
+        scope = ArtifactScope("default", "org/repo", task_id)
+        artifact_refs = {}
+        for index, (run_id, evidence_id, output) in enumerate((
+            ("security-1", "relevant-evidence", "historical relevant repository fact"),
+            ("other-run", "unrelated-evidence", "must not enter attribution"),
+        )):
+            artifact = Artifact.for_tool_result(
+                scope, "security", "revision", "logical:%d" % index,
+                {"evidence_id": evidence_id, "tool": "read_file", "output": output},
+                evidence_id, {"tool": "read_file", "producer_run_id": run_id},
+            )
+            service.store.put_artifact(artifact.to_dict())
+            artifact_refs[artifact.artifact_id] = artifact.ref().to_dict()
+        session["artifact_refs"] = artifact_refs
         service.store.save_checkpoint(
             task_id, "agentic-lead-session", checkpoint["state"], "completed", 1,
         )
@@ -474,15 +472,19 @@ class ServiceTests(unittest.TestCase):
         self._save_discovery_evidence(service, task_id)
         checkpoint = service.store.load_checkpoints(task_id)["agentic-lead-session"]
         session = checkpoint["state"]["session"]
-        artifacts = {}
-        reference = capture_tool_evidence_artifact(
-            task_id, artifacts,
-            {"role": "security", "run_id": "security-1", "step": 1,
-             "tool": "read_file"},
+        scope = ArtifactScope("default", "org/repo", task_id)
+        artifact = Artifact.for_tool_result(
+            scope, "security", "revision", "logical:corrupt",
             {"evidence_id": "corrupt", "tool": "read_file", "output": "fact"},
+            "corrupt", {"tool": "read_file", "producer_run_id": "security-1"},
         )
-        artifacts[reference["artifact_id"]]["content_sha256"] = "0" * 64
-        session["evidence_artifacts"] = artifacts
+        service.store.put_artifact(artifact.to_dict())
+        session["artifact_refs"] = {artifact.artifact_id: artifact.ref().to_dict()}
+        with service.store._connect() as conn:
+            conn.execute(
+                "UPDATE artifacts SET content_hash=? WHERE artifact_id=?",
+                ("0" * 64, artifact.artifact_id),
+            )
         service.store.save_checkpoint(
             task_id, "agentic-lead-session", checkpoint["state"], "completed", 1,
         )

@@ -5,6 +5,13 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from .artifacts import (
+    ArtifactAccessDenied,
+    ArtifactIntegrityConflict,
+    ArtifactNotFound,
+    ArtifactPersistFailed,
+    MAX_TASK_ARTIFACT_BYTES,
+)
 from .models import ReviewReport, TaskState, TraceEvent
 
 
@@ -302,12 +309,121 @@ class TaskStore:
                 "CREATE INDEX IF NOT EXISTS idx_agent_memories_lookup "
                 "ON agent_memories(tenant_id, repository, scope, created_at)"
             )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS artifacts (
+                    artifact_id TEXT PRIMARY KEY,
+                    artifact_type TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    repository TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    producer TEXT NOT NULL,
+                    source_revision TEXT NOT NULL,
+                    logical_execution_key TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    content_size_bytes INTEGER NOT NULL,
+                    content_json TEXT NOT NULL,
+                    evidence_id TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(tenant_id, repository, task_id, logical_execution_key),
+                    FOREIGN KEY(task_id) REFERENCES tasks(id)
+                )"""
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_artifacts_task "
+                "ON artifacts(tenant_id, repository, task_id, created_at)"
+            )
 
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaration: str) -> None:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(%s)" % table).fetchall()}
         if column not in columns:
             conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, declaration))
+
+    @staticmethod
+    def _artifact_from_row(row) -> Dict[str, Any]:
+        value = dict(row)
+        value["content"] = json.loads(value.pop("content_json"))
+        value["metadata"] = json.loads(value.pop("metadata_json"))
+        return value
+
+    def put_artifact(self, artifact: Dict[str, Any]) -> Dict[str, Any]:
+        """Insert immutable content or return the existing logical artifact."""
+        scope = (artifact["tenant_id"], artifact["repository"], artifact["task_id"])
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            owner = conn.execute(
+                "SELECT tenant_id,repository FROM tasks WHERE id=?", (artifact["task_id"],)
+            ).fetchone()
+            if not owner:
+                raise ArtifactPersistFailed("artifact task does not exist")
+            if (owner["tenant_id"], owner["repository"]) != scope[:2]:
+                raise ArtifactAccessDenied("artifact scope does not match its owning task")
+            existing = conn.execute(
+                "SELECT * FROM artifacts WHERE tenant_id=? AND repository=? AND task_id=? "
+                "AND logical_execution_key=?",
+                (*scope, artifact["logical_execution_key"]),
+            ).fetchone()
+            if existing:
+                value = self._artifact_from_row(existing)
+                if value["content_hash"] != artifact["content_hash"]:
+                    raise ArtifactIntegrityConflict(
+                        "logical tool execution already has different immutable content"
+                    )
+                return value
+            total = conn.execute(
+                "SELECT COALESCE(SUM(content_size_bytes),0) AS n FROM artifacts "
+                "WHERE tenant_id=? AND repository=? AND task_id=?", scope,
+            ).fetchone()["n"]
+            if int(total) + int(artifact["content_size_bytes"]) > MAX_TASK_ARTIFACT_BYTES:
+                raise ArtifactPersistFailed("task artifact byte budget would be exceeded")
+            conn.execute(
+                "INSERT INTO artifacts(artifact_id,artifact_type,tenant_id,repository,task_id,"
+                "producer,source_revision,logical_execution_key,content_hash,content_size_bytes,"
+                "content_json,evidence_id,metadata_json,created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    artifact["artifact_id"], artifact["artifact_type"], *scope,
+                    artifact["producer"], artifact.get("source_revision", ""),
+                    artifact["logical_execution_key"], artifact["content_hash"],
+                    int(artifact["content_size_bytes"]),
+                    json.dumps(artifact["content"], ensure_ascii=False, sort_keys=True),
+                    artifact.get("evidence_id", ""),
+                    json.dumps(artifact.get("metadata", {}), ensure_ascii=False, sort_keys=True),
+                    artifact["created_at"],
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM artifacts WHERE artifact_id=?", (artifact["artifact_id"],)
+            ).fetchone()
+        return self._artifact_from_row(row)
+
+    def get_artifact(
+        self, artifact_id: str, tenant_id: str, repository: str, task_id: str,
+    ) -> Dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM artifacts WHERE artifact_id=?", (artifact_id,)
+            ).fetchone()
+        if not row:
+            raise ArtifactNotFound("artifact does not exist")
+        value = self._artifact_from_row(row)
+        if (value["tenant_id"], value["repository"], value["task_id"]) != (
+            tenant_id, repository, task_id
+        ):
+            raise ArtifactAccessDenied("artifact is outside the current task scope")
+        return value
+
+    def get_artifact_by_logical_execution_key(
+        self, logical_execution_key: str, tenant_id: str, repository: str, task_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM artifacts WHERE tenant_id=? AND repository=? AND task_id=? "
+                "AND logical_execution_key=?",
+                (tenant_id, repository, task_id, logical_execution_key),
+            ).fetchone()
+        return self._artifact_from_row(row) if row else None
 
     def create(
         self, task_id: str, repository: str, pull_request: Optional[int],

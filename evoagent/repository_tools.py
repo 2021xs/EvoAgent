@@ -15,6 +15,16 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 from .diff_parser import ParsedDiff
 from .runtime import AgentTool, ToolRegistry
+
+
+# These handlers are repository observations: they never mutate the checked-out
+# source.  The list is intentionally explicit because artifact replay must not
+# become an accidental naming convention for future mutating tools.
+ARTIFACT_REPLAYABLE_TOOLS = frozenset({
+    "list_repository", "search_repository", "search_diff", "read_file",
+    "changed_line", "symbol", "locate_tests", "read_project_controls",
+    "ast_analyze", "git_context", "run_scanners", "run_repository_checks",
+})
 from .telemetry import ExecutionLedger
 
 
@@ -427,5 +437,8 @@ class RepositoryToolSuite:
                             int((time.monotonic() - started) * 1000), error=str(exc),
                         )
                     raise
-            tools.append(AgentTool(name, description, schema, wrapped))
+            tools.append(AgentTool(
+                name, description, schema, wrapped,
+                artifact_replay=name in ARTIFACT_REPLAYABLE_TOOLS,
+            ))
         return ToolRegistry(tools)

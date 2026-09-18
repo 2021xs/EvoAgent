@@ -13,6 +13,14 @@ import time
 import uuid
 from typing import Any, Dict, Iterable, List, Optional, Set
 
+from .artifacts import (
+    ArtifactError,
+    ArtifactIntegrityConflict,
+    ArtifactPersistFailed,
+    ArtifactRuntime,
+    ArtifactScope,
+    DEFAULT_ARTIFACT_READ_CHARS,
+)
 from .diff_parser import ParsedDiff
 from .context_manager import ContextManager
 from .gates import FindingGate
@@ -118,10 +126,7 @@ EXECUTION_PROFILE_SCHEMA_VERSION = 1
 # Current bundled Agent Skills total only tens of KiB.  Keep the private
 # checkpoint bounded without introducing a separate artifact store.
 MAX_EXECUTION_PROFILE_BYTES = 2 * 1024 * 1024
-TOOL_EVIDENCE_KIND = "TOOL_EVIDENCE"
-MAX_EVIDENCE_ARTIFACT_BYTES = 1024 * 1024
-MAX_TASK_EVIDENCE_ARTIFACT_BYTES = 4 * 1024 * 1024
-EVIDENCE_PREVIEW_CHARS = 2000
+EVIDENCE_PREVIEW_CHARS = DEFAULT_ARTIFACT_READ_CHARS
 LOGICAL_ISSUE_SCHEMA_VERSION = 1
 MAX_LOGICAL_ISSUE_MODEL_EVIDENCE_REFS = 20
 
@@ -130,38 +135,8 @@ class ExecutionConfigurationError(RuntimeError):
     """A Task cannot safely continue under a different execution configuration."""
 
 
-class EvidenceArtifactError(RuntimeError):
-    """Private Task evidence is malformed or cannot be safely dereferenced."""
-
-
 class LogicalIssueError(RuntimeError):
     """Private Task issue aggregation is malformed or internally inconsistent."""
-
-
-@dataclass(frozen=True)
-class EvidenceArtifact:
-    artifact_id: str
-    task_id: str
-    kind: str
-    producer: Dict[str, Any]
-    evidence_id: str
-    content: Optional[Any]
-    content_sha256: str
-    preview: str
-    metadata: Dict[str, Any]
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "artifact_id": self.artifact_id,
-            "task_id": self.task_id,
-            "kind": self.kind,
-            "producer": copy.deepcopy(self.producer),
-            "evidence_id": self.evidence_id,
-            "content": copy.deepcopy(self.content),
-            "content_sha256": self.content_sha256,
-            "preview": self.preview,
-            "metadata": copy.deepcopy(self.metadata),
-        }
 
 
 @dataclass
@@ -183,217 +158,6 @@ class LogicalIssue:
             "contributors": copy.deepcopy(self.contributors),
             "merged_evidence_refs": copy.deepcopy(self.merged_evidence_refs),
         }
-
-
-def _artifact_json(value: Any) -> str:
-    return json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-    )
-
-
-def _artifact_preview(result: Any) -> str:
-    output = result.get("output") if isinstance(result, dict) else result
-    try:
-        return json.dumps(output, ensure_ascii=False, default=str)[:EVIDENCE_PREVIEW_CHARS]
-    except (TypeError, ValueError):
-        return str(output)[:EVIDENCE_PREVIEW_CHARS]
-
-
-def _available_artifact_bytes(artifacts: Dict[str, Any]) -> int:
-    total = 0
-    for value in artifacts.values():
-        if not isinstance(value, dict):
-            continue
-        metadata = value.get("metadata") or {}
-        if metadata.get("content_available"):
-            total += int(metadata.get("original_size") or 0)
-    return total
-
-
-def _validate_evidence_artifact(
-    task_id: str, artifact_id: str, value: Dict[str, Any],
-) -> Dict[str, Any]:
-    if not task_id:
-        raise EvidenceArtifactError("evidence artifact requires a Task identity")
-    if not isinstance(value, dict) or value.get("artifact_id") != artifact_id:
-        raise EvidenceArtifactError("evidence artifact identity is malformed")
-    if value.get("task_id") != task_id or value.get("kind") != TOOL_EVIDENCE_KIND:
-        raise EvidenceArtifactError("evidence artifact Task/kind mismatch")
-    producer = value.get("producer")
-    if not isinstance(producer, dict) or any(
-        key not in producer for key in ("role", "run_id", "step", "tool")
-    ):
-        raise EvidenceArtifactError("evidence artifact producer is malformed")
-    if (
-        not str(producer.get("role") or "")
-        or not str(producer.get("run_id") or "")
-        or not str(producer.get("tool") or "")
-    ):
-        raise EvidenceArtifactError("evidence artifact producer is incomplete")
-    try:
-        if int(producer.get("step")) <= 0:
-            raise ValueError
-    except (TypeError, ValueError):
-        raise EvidenceArtifactError("evidence artifact producer step is malformed")
-    evidence_id = str(value.get("evidence_id") or "")
-    digest = str(value.get("content_sha256") or "")
-    preview = value.get("preview")
-    metadata = value.get("metadata")
-    if not evidence_id or len(digest) != 64 or not isinstance(preview, str):
-        raise EvidenceArtifactError("evidence artifact fields are malformed")
-    if not isinstance(metadata, dict) or not isinstance(
-        metadata.get("content_available"), bool
-    ):
-        raise EvidenceArtifactError("evidence artifact availability is malformed")
-    try:
-        original_size = int(metadata.get("original_size"))
-    except (TypeError, ValueError):
-        raise EvidenceArtifactError("evidence artifact size is malformed")
-    if original_size < 0:
-        raise EvidenceArtifactError("evidence artifact size is malformed")
-    if metadata["content_available"]:
-        try:
-            rendered = _artifact_json(value.get("content"))
-        except (TypeError, ValueError) as exc:
-            raise EvidenceArtifactError(
-                "evidence artifact content is not JSON-compatible"
-            ) from exc
-        if len(rendered.encode("utf-8")) != original_size:
-            raise EvidenceArtifactError("evidence artifact size check failed")
-        if hashlib.sha256(rendered.encode("utf-8")).hexdigest() != digest:
-            raise EvidenceArtifactError("evidence artifact hash check failed")
-    elif value.get("content") is not None or not str(metadata.get("reason") or ""):
-        raise EvidenceArtifactError("unavailable evidence artifact is malformed")
-    return value
-
-
-def capture_tool_evidence_artifact(
-    task_id: str, artifacts: Dict[str, Any], producer: Dict[str, Any], result: Any,
-) -> Optional[Dict[str, Any]]:
-    if not task_id:
-        raise EvidenceArtifactError("tool evidence requires a Task identity")
-    if not isinstance(result, dict) or not result.get("evidence_id"):
-        return None
-    try:
-        rendered = _artifact_json(result)
-        encoded = rendered.encode("utf-8")
-        json_compatible = True
-    except (TypeError, ValueError):
-        rendered = json.dumps(result, ensure_ascii=False, default=str, sort_keys=True)
-        encoded = rendered.encode("utf-8")
-        json_compatible = False
-    artifact_id = "artifact:%s" % uuid.uuid4().hex
-    digest = hashlib.sha256(encoded).hexdigest()
-    size = len(encoded)
-    reason = ""
-    available = json_compatible
-    if not json_compatible:
-        reason = "artifact_not_json_compatible"
-    elif size > MAX_EVIDENCE_ARTIFACT_BYTES:
-        available = False
-        reason = "artifact_too_large"
-    elif _available_artifact_bytes(artifacts) + size > MAX_TASK_EVIDENCE_ARTIFACT_BYTES:
-        available = False
-        reason = "task_artifact_budget_exceeded"
-    record = EvidenceArtifact(
-        artifact_id=artifact_id,
-        task_id=task_id,
-        kind=TOOL_EVIDENCE_KIND,
-        producer={
-            "role": str(producer.get("role") or ""),
-            "run_id": str(producer.get("run_id") or ""),
-            "step": int(producer.get("step") or 0),
-            "tool": str(producer.get("tool") or result.get("tool") or ""),
-        },
-        evidence_id=str(result["evidence_id"]),
-        content=copy.deepcopy(result) if available else None,
-        content_sha256=digest,
-        preview=_artifact_preview(result),
-        metadata={
-            "content_available": available,
-            "original_size": size,
-            **({"reason": reason} if reason else {}),
-        },
-    ).to_dict()
-    _validate_evidence_artifact(task_id, artifact_id, record)
-    artifacts[artifact_id] = record
-    return {
-        "artifact_id": artifact_id,
-        "content_sha256": digest,
-        "evidence_id": record["evidence_id"],
-        "tool": record["producer"]["tool"],
-        "output_preview": record["preview"],
-    }
-
-
-def resolve_evidence_artifact_ref(
-    task_id: str, artifacts: Dict[str, Any], reference: Dict[str, Any],
-    max_chars: int = EVIDENCE_PREVIEW_CHARS,
-) -> Dict[str, Any]:
-    artifact_id = str(reference.get("artifact_id") or "")
-    if not artifact_id or artifact_id not in artifacts:
-        raise EvidenceArtifactError("referenced evidence artifact is missing")
-    value = _validate_evidence_artifact(task_id, artifact_id, artifacts[artifact_id])
-    if str(reference.get("content_sha256") or "") != value["content_sha256"]:
-        raise EvidenceArtifactError("evidence artifact reference hash mismatch")
-    if str(reference.get("evidence_id") or "") != value["evidence_id"]:
-        raise EvidenceArtifactError("evidence artifact reference evidence_id mismatch")
-    tool = str(value["producer"]["tool"])
-    if str(reference.get("tool") or "") != tool:
-        raise EvidenceArtifactError("evidence artifact reference tool mismatch")
-    available = bool(value["metadata"]["content_available"])
-    preview = value["preview"][:max(0, int(max_chars))]
-    if available:
-        preview = _artifact_preview(value["content"])[:max(0, int(max_chars))]
-    return {
-        "evidence_id": value["evidence_id"],
-        "tool": tool,
-        "output_preview": preview,
-        "content_available": available,
-        **({"reason": value["metadata"].get("reason", "")} if not available else {}),
-    }
-
-
-def _merge_evidence_artifacts(
-    task_id: str, target: Dict[str, Any], captured: Dict[str, Any],
-) -> None:
-    """Merge invocation-local captures while enforcing the Task-wide byte cap."""
-    for artifact_id, raw in captured.items():
-        value = copy.deepcopy(
-            _validate_evidence_artifact(task_id, str(artifact_id), raw)
-        )
-        if artifact_id in target:
-            if target[artifact_id] != value:
-                raise EvidenceArtifactError("evidence artifact identity collision")
-            continue
-        size = int((value.get("metadata") or {}).get("original_size") or 0)
-        if (
-            (value.get("metadata") or {}).get("content_available")
-            and _available_artifact_bytes(target) + size
-            > MAX_TASK_EVIDENCE_ARTIFACT_BYTES
-        ):
-            value["content"] = None
-            value["metadata"] = {
-                **value["metadata"],
-                "content_available": False,
-                "reason": "task_artifact_budget_exceeded",
-            }
-        _validate_evidence_artifact(task_id, str(artifact_id), value)
-        target[str(artifact_id)] = value
-
-
-def _validated_evidence_artifacts(
-    task_id: str, raw: Any,
-) -> Dict[str, Any]:
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise EvidenceArtifactError("Task evidence artifact map is malformed")
-    for artifact_id, value in raw.items():
-        _validate_evidence_artifact(task_id, str(artifact_id), value)
-    if _available_artifact_bytes(raw) > MAX_TASK_EVIDENCE_ARTIFACT_BYTES:
-        raise EvidenceArtifactError("Task evidence artifact budget is exceeded")
-    return raw
 
 
 class AgentMessageType(str, Enum):
@@ -454,11 +218,14 @@ def _without_candidate_metadata(value):
             if key not in {
                 "candidate_id", "candidate_trace", "worker_execution_snapshots",
                 "critic_challenge", "critic_pass1_decisions", "execution_profile",
-                "evidence_artifacts", "logical_issues", "logical_issue_id",
+                "artifact_refs", "logical_issues", "logical_issue_id",
                 "scanner_candidates",
             }
             and not (
-                artifact_reference and key in {"artifact_id", "content_sha256"}
+                artifact_reference and key in {
+                    "artifact_id", "artifact_type", "content_hash",
+                    "content_size_bytes", "logical_execution_key",
+                }
             )
         }
     if isinstance(value, list):
@@ -608,7 +375,7 @@ class BoundedRole:
         context_manager: Optional[ContextManager] = None,
         working_memory_supplier=None, observation_sink=None,
         execution_capture: Optional[Dict[str, Any]] = None,
-        artifact_sink=None,
+        artifact_runtime: Optional[ArtifactRuntime] = None,
         max_output_tokens: int = 4000,
     ):
         self.name = name
@@ -621,7 +388,7 @@ class BoundedRole:
         self.working_memory_supplier = working_memory_supplier
         self.observation_sink = observation_sink
         self.execution_capture = execution_capture
-        self.artifact_sink = artifact_sink
+        self.artifact_runtime = artifact_runtime
         self.max_output_tokens = max(128, int(max_output_tokens))
 
     def run(
@@ -709,20 +476,35 @@ class BoundedRole:
             tool_name = str(action.get("tool", ""))
             arguments = action.get("arguments") or {}
             try:
-                value = tools.invoke(tool_name, arguments)
+                tool = tools.tool(tool_name)
+                reference = None
+                replayed = False
+                if tool.artifact_replay:
+                    if self.artifact_runtime is None:
+                        raise ArtifactPersistFailed(
+                            "artifact-replay tool has no durable runtime binding"
+                        )
+                    value, reference, replayed = self.artifact_runtime.invoke(
+                        tools, tool_name, arguments, step,
+                    )
+                else:
+                    value = tools.invoke(tool_name, arguments)
                 observation = {
                     "step": step, "tool": tool_name, "ok": True, "result": value,
+                    **({"artifact_replayed": True} if replayed else {}),
                 }
+                if reference is not None:
+                    artifact_refs[str(reference.evidence_id)] = reference.to_dict()
+            except ArtifactError:
+                # Durable-evidence failures are workflow failures.  Do not turn
+                # them into model-visible ephemeral error observations.
+                raise
             except Exception as exc:
                 observation = {
                     "step": step, "tool": tool_name, "ok": False,
                     "error": str(exc)[:1000],
                 }
             observations.append(observation)
-            if observation["ok"] and self.artifact_sink is not None:
-                reference = self.artifact_sink(self.name, observation)
-                if isinstance(reference, dict) and reference.get("evidence_id"):
-                    artifact_refs[str(reference["evidence_id"])] = reference
             if self.observation_sink is not None:
                 try:
                     self.observation_sink(self.name, observation)
@@ -733,6 +515,7 @@ class BoundedRole:
             ledger.trace(
                 self.name, "tool_observation", step=step, tool=tool_name,
                 ok=observation["ok"],
+                artifact_replayed=bool(observation.get("artifact_replayed")),
             )
         ledger.trace(self.name, "budget_exhausted", budget="steps")
         raise RuntimeBudgetExceeded("%s step budget exhausted" % self.name)
@@ -1179,9 +962,17 @@ class AgenticReviewer(Reviewer):
             "context-manager", "memory_recalled", count=len(recalled),
             repository=repository, tenant_id=tenant_id,
         )
+        artifact_scope = ArtifactScope(tenant_id, repository, task_id)
+        source_revision = str(
+            task_input.get("review_head_revision")
+            or task_input.get("head_sha")
+            or task_input.get("commit_sha")
+            or hashlib.sha256(diff.encode("utf-8")).hexdigest()
+        )
         findings, collaboration, components = self._agentic(
             task_id, diff, parsed, suite, ledger, enabled, scanners, memory_context,
             available_skills, requested_skills, session, execution_profile,
+            artifact_scope, source_revision,
         )
         gated = self.gate.apply(findings, parsed)
         ledger.trace("evidence-gate", "completed", **gated.checks)
@@ -1285,7 +1076,8 @@ class AgenticReviewer(Reviewer):
     def _agentic(
         self, task_id, diff, parsed, suite, ledger, enabled, scanners=None,
         memory_context=None, available_skills=None, requested_skills=None,
-        session=None, execution_profile=None,
+        session=None, execution_profile=None, artifact_scope=None,
+        source_revision="",
     ):
         if "lead" not in enabled:
             raise ValueError("agentic mode requires the lead Agent")
@@ -1303,7 +1095,7 @@ class AgenticReviewer(Reviewer):
         new_session = not session
         if new_session:
             session = {
-                "protocol": "lead-workers-v3", "phase": "created",
+                "protocol": "lead-workers-v4", "phase": "created",
                 "scanner_complete": False, "scanner_candidates": [],
                 "scanner_findings": [],
                 "scanner_components": [],
@@ -1316,7 +1108,7 @@ class AgenticReviewer(Reviewer):
                 "revision_rounds": 0,
                 "candidate_trace": {"candidates": {}, "merge_lineage": []},
                 "worker_execution_snapshots": {},
-                "evidence_artifacts": {},
+                "artifact_refs": {},
                 "logical_issues": None,
                 "execution_profile": execution_profile,
             }
@@ -1329,9 +1121,8 @@ class AgenticReviewer(Reviewer):
             )
         if not isinstance(session.get("worker_execution_snapshots"), dict):
             session["worker_execution_snapshots"] = {}
-        session["evidence_artifacts"] = _validated_evidence_artifacts(
-            task_id, session.get("evidence_artifacts"),
-        )
+        if not isinstance(session.get("artifact_refs"), dict):
+            raise ExecutionConfigurationError("Task ArtifactRef checkpoint state is malformed")
         trace = _candidate_trace(session)
         self._restore_trace_origins(session, trace)
 
@@ -1397,6 +1188,8 @@ class AgenticReviewer(Reviewer):
             max_steps=3 if high_risk else 1,
             allow_tools=high_risk,
             execution_profile=execution_profile,
+            artifact_scope=artifact_scope,
+            source_revision=source_revision,
         )
         session["phase"] = "workers-completed"
         self._save_lead_session(task_id, session, ledger)
@@ -1451,6 +1244,8 @@ class AgenticReviewer(Reviewer):
                 max_steps=2,
                 allow_tools=True,
                 execution_profile=execution_profile,
+                artifact_scope=artifact_scope,
+                source_revision=source_revision,
             )
             for revision in revision_assignments:
                 key = revision["run_id"]
@@ -1469,7 +1264,7 @@ class AgenticReviewer(Reviewer):
                 self._save_lead_session(task_id, session, ledger)
 
         logical_issues, issues_created = self._prepare_logical_issues(
-            task_id, session, trace,
+            task_id, session, trace, artifact_scope, source_revision,
         )
         candidates = self._logical_issue_projections(logical_issues)
         if issues_created:
@@ -1509,6 +1304,8 @@ class AgenticReviewer(Reviewer):
                         memory_context=memory_context,
                         available_skills=available_skills,
                         execution_profile=execution_profile,
+                        artifact_scope=artifact_scope,
+                        source_revision=source_revision,
                     )
                 except Exception:
                     # The optional challenge must not make an otherwise valid
@@ -1522,6 +1319,11 @@ class AgenticReviewer(Reviewer):
                     session["phase"] = "critic-challenge-complete"
                 else:
                     challenge["response"] = response.to_dict()
+                    for reference in response.payload.get("evidence_refs") or []:
+                        if isinstance(reference, dict) and reference.get("artifact_id"):
+                            session["artifact_refs"][str(reference["artifact_id"])] = (
+                                copy.deepcopy(reference)
+                            )
                     index = int(challenge["finding_index"])
                     candidates[index].evidence_refs = _append_evidence_refs(
                         candidates[index].evidence_refs,
@@ -1544,12 +1346,13 @@ class AgenticReviewer(Reviewer):
                     final_result = self._run_critic_final(
                         candidates[index], index, request, response,
                         ledger, task_id, execution_profile=execution_profile,
-                        evidence_artifacts=session["evidence_artifacts"],
+                        artifact_scope=artifact_scope,
+                        source_revision=source_revision,
                     )
                     challenge["final_decision"] = self._final_critic_decision(
                         final_result, index, fallback,
                     )
-                except EvidenceArtifactError as exc:
+                except ArtifactError as exc:
                     # The optional communication round degrades to the durable
                     # Pass-1 verdict; never invent or substitute evidence.
                     challenge["final_decision"] = fallback
@@ -1801,9 +1604,21 @@ class AgenticReviewer(Reviewer):
             return
         checkpoint = (loader(task_id) or {}).get("agentic-lead-session") or {}
         state = checkpoint.get("state") or {}
-        if state.get("protocol") != "lead-workers-v3":
+        if state.get("protocol") != "lead-workers-v4":
             return
         session = dict(state.get("session") or {})
+        task = self.store.get(task_id) or {}
+        artifact_scope = ArtifactScope(
+            str(task.get("tenant_id") or "default"),
+            str(task.get("repository") or ""), task_id,
+        )
+        task_input = task.get("input") or {}
+        source_revision = str(
+            task_input.get("review_head_revision")
+            or task_input.get("head_sha")
+            or task_input.get("commit_sha")
+            or ""
+        )
         trace = _candidate_trace(session)
         self._restore_trace_origins(session, trace)
         for finding in findings:
@@ -1817,7 +1632,7 @@ class AgenticReviewer(Reviewer):
         if session.get("logical_issues") is not None:
             issues = self._restore_logical_issues(
                 task_id, session["logical_issues"],
-                session.get("evidence_artifacts") or {},
+                artifact_scope, source_revision,
             )
             by_id = {
                 finding.candidate_id: finding
@@ -2100,6 +1915,7 @@ class AgenticReviewer(Reviewer):
     def _route_agent_message(
         self, message, task_id, session, candidates, diff, parsed, suite, ledger,
         memory_context=None, available_skills=None, execution_profile=None,
+        artifact_scope=None, source_revision="",
     ):
         """Validate and synchronously route one supported point-to-point message."""
         challenge = session.get("critic_challenge")
@@ -2135,12 +1951,15 @@ class AgenticReviewer(Reviewer):
             return None
         if self._token_budget(route["worker"], execution_profile) <= 0:
             return None
+        routed_assignment = dict(route["assignment"])
+        routed_assignment["revision_round"] = route["revision_round"]
         return self._run_worker_evidence_response(
-            message, route["assignment"], candidate, task_id, diff, parsed,
+            message, routed_assignment, candidate, task_id, diff, parsed,
             suite, ledger, memory_context=memory_context,
             available_skills=available_skills,
             execution_profile=execution_profile,
-            evidence_artifacts=session["evidence_artifacts"],
+            artifact_scope=artifact_scope,
+            source_revision=source_revision,
         )
 
     def _worker_prompt(
@@ -2168,7 +1987,7 @@ class AgenticReviewer(Reviewer):
     def _run_worker_evidence_response(
         self, request, assignment, candidate, task_id, diff, parsed, suite, ledger,
         memory_context=None, available_skills=None, execution_profile=None,
-        evidence_artifacts=None,
+        artifact_scope=None, source_revision="",
     ):
         worker = request.recipient
         selected_skills = [
@@ -2181,17 +2000,13 @@ class AgenticReviewer(Reviewer):
             execution_profile=execution_profile,
         )
         working_memory_supplier, _observation_sink = self._memory_hooks(task_id, worker)
-        captured = {}
-
-        def artifact_sink(role, observation):
-            return capture_tool_evidence_artifact(
-                task_id, captured, {
-                    "role": role,
-                    "run_id": "evidence:%s" % request.message_id,
-                    "step": observation.get("step"),
-                    "tool": observation.get("tool"),
-                }, observation.get("result"),
-            )
+        artifact_runtime = ArtifactRuntime(
+            self.store, artifact_scope, source_revision,
+            str(assignment["assignment_id"]),
+            int(assignment.get("revision_round", 0) or 0),
+            worker, "critic-evidence:%s" % request.message_id,
+            "evidence:%s" % request.message_id,
+        )
 
         role = BoundedRole(
             worker, prompt, self.client,
@@ -2202,7 +2017,7 @@ class AgenticReviewer(Reviewer):
             # The response is point-to-point Critic evidence, not shared task
             # conversation. Keep its tool observations out of Working Memory.
             observation_sink=None,
-            artifact_sink=artifact_sink,
+            artifact_runtime=artifact_runtime,
         )
         context = {
             "communication_type": AgentMessageType.REQUEST_EVIDENCE.value,
@@ -2230,13 +2045,10 @@ class AgenticReviewer(Reviewer):
             worker, self._skill_tool_permissions(worker, selected_skills)
         )
         self._register_skill_resource_tool(tools, selected_skills)
+        self._register_artifact_read_tool(tools, artifact_runtime)
         result = role.run(
             json.dumps(_without_candidate_metadata(context), ensure_ascii=False),
             tools, ledger,
-        )
-        _merge_evidence_artifacts(
-            task_id, evidence_artifacts if evidence_artifacts is not None else {},
-            captured,
         )
         status = str(result.get("status", "")).strip().lower()
         if status not in {"answered", "insufficient"}:
@@ -2265,7 +2077,7 @@ class AgenticReviewer(Reviewer):
 
     def _run_critic_final(
         self, candidate, finding_index, request, response, ledger, context_key,
-        execution_profile=None, evidence_artifacts=None,
+        execution_profile=None, artifact_scope=None, source_revision="",
     ):
         working_memory_supplier, observation_sink = self._memory_hooks(
             context_key, "critic"
@@ -2292,9 +2104,12 @@ class AgenticReviewer(Reviewer):
             if not isinstance(reference, dict):
                 continue
             if reference.get("artifact_id"):
-                materialized.append(resolve_evidence_artifact_ref(
-                    context_key, evidence_artifacts or {}, reference,
-                    EVIDENCE_PREVIEW_CHARS,
+                resolver = ArtifactRuntime(
+                    self.store, artifact_scope, source_revision,
+                    "critic-final", 0, "critic", "critic-final",
+                )
+                materialized.append(resolver.resolve_ref(
+                    reference, EVIDENCE_PREVIEW_CHARS,
                 ))
             else:
                 materialized.append(_without_candidate_metadata(reference))
@@ -2328,7 +2143,7 @@ class AgenticReviewer(Reviewer):
     def _run_pending_assignments(
         self, task_id, session, diff, parsed, suite, ledger, assignments, revision_round,
         memory_context=None, available_skills=None, max_steps=3, allow_tools=True,
-        execution_profile=None,
+        execution_profile=None, artifact_scope=None, source_revision="",
     ):
         pending = [
             item for item in assignments
@@ -2338,7 +2153,7 @@ class AgenticReviewer(Reviewer):
         if not pending:
             return
 
-        def run(assignment, execution_capture, artifact_capture):
+        def run(assignment, execution_capture):
             worker = assignment["worker"]
             run_id = str(assignment.get("run_id") or assignment["assignment_id"])
             selected_skills = [
@@ -2366,14 +2181,12 @@ class AgenticReviewer(Reviewer):
             })
             working_memory_supplier, observation_sink = self._memory_hooks(task_id, worker)
 
-            def artifact_sink(role, observation):
-                return capture_tool_evidence_artifact(
-                    task_id, artifact_capture, {
-                        "role": role, "run_id": run_id,
-                        "step": observation.get("step"),
-                        "tool": observation.get("tool"),
-                    }, observation.get("result"),
-                )
+            artifact_runtime = ArtifactRuntime(
+                self.store, artifact_scope, source_revision,
+                str(assignment["assignment_id"]), int(revision_round),
+                worker, "assignment",
+                run_id,
+            )
 
             role = BoundedRole(
                 worker, prompt, self.client,
@@ -2384,7 +2197,7 @@ class AgenticReviewer(Reviewer):
                 working_memory_supplier=working_memory_supplier,
                 observation_sink=observation_sink,
                 execution_capture=execution_capture,
-                artifact_sink=artifact_sink,
+                artifact_runtime=artifact_runtime,
             )
             context = {
                 "lead_assignment": assignment,
@@ -2415,6 +2228,7 @@ class AgenticReviewer(Reviewer):
             )
             if allow_tools:
                 self._register_skill_resource_tool(tools, selected_skills)
+                self._register_artifact_read_tool(tools, artifact_runtime)
             return role.run(
                 json.dumps(_without_candidate_metadata(context), ensure_ascii=False),
                 tools, ledger,
@@ -2424,24 +2238,18 @@ class AgenticReviewer(Reviewer):
             str(item.get("run_id") or item["assignment_id"]): {}
             for item in pending
         }
-        artifact_captures = {
-            str(item.get("run_id") or item["assignment_id"]): {}
-            for item in pending
-        }
         with ThreadPoolExecutor(max_workers=max(1, len(pending))) as pool:
             futures = {
                 pool.submit(
                     run, item,
                     captures[str(item.get("run_id") or item["assignment_id"])],
-                    artifact_captures[
-                        str(item.get("run_id") or item["assignment_id"])
-                    ],
                 ): item
                 for item in pending
             }
             for future in as_completed(futures):
                 assignment = futures[future]
                 run_id = str(assignment.get("run_id") or assignment["assignment_id"])
+                worker_action = {}
                 try:
                     worker_action = future.result()
                     findings = _parse_findings(
@@ -2474,10 +2282,18 @@ class AgenticReviewer(Reviewer):
                         "revision_round": revision_round, "status": "failed",
                         "findings": [], "error": str(exc)[:1000],
                     }
-                _merge_evidence_artifacts(
-                    task_id, session["evidence_artifacts"],
-                    artifact_captures[run_id],
-                )
+                for reference in (
+                    worker_action.get("_evidence_artifact_refs") or {}
+                ).values():
+                    if not isinstance(reference, dict) or not reference.get("artifact_id"):
+                        continue
+                    artifact_id = str(reference["artifact_id"])
+                    existing = session["artifact_refs"].get(artifact_id)
+                    if existing is not None and existing != reference:
+                        raise ArtifactIntegrityConflict(
+                            "checkpoint ArtifactRef identity collision"
+                        )
+                    session["artifact_refs"][artifact_id] = copy.deepcopy(reference)
                 session["worker_execution_snapshots"][run_id] = captures[run_id]
                 session["worker_results"][run_id] = result
                 ledger.trace(
@@ -2579,6 +2395,26 @@ class AgenticReviewer(Reviewer):
                 "required": ["skill", "path"], "additionalProperties": False,
             },
             read_skill_resource,
+        ))
+
+    @staticmethod
+    def _register_artifact_read_tool(tools, artifact_runtime):
+        def read_artifact(artifact_id: str, offset: int = 0, max_chars: int = 2000):
+            return artifact_runtime.materialize(artifact_id, offset, max_chars)
+
+        tools.register(AgentTool(
+            "read_artifact",
+            "Read a bounded character range from a durable Tool Result Artifact.",
+            {
+                "type": "object",
+                "properties": {
+                    "artifact_id": {"type": "string"},
+                    "offset": {"type": "integer", "minimum": 0},
+                    "max_chars": {"type": "integer", "minimum": 1, "maximum": 12000},
+                },
+                "required": ["artifact_id"], "additionalProperties": False,
+            },
+            read_artifact,
         ))
 
     @staticmethod
@@ -2695,7 +2531,9 @@ class AgenticReviewer(Reviewer):
                     ] = issue.logical_issue_id
         return issues
 
-    def _restore_logical_issues(self, task_id, values, artifacts):
+    def _restore_logical_issues(
+        self, task_id, values, artifact_scope, source_revision="",
+    ):
         if not isinstance(values, list):
             raise LogicalIssueError("logical issue state is malformed")
         issues, issue_ids, candidate_ids = [], set(), set()
@@ -2753,9 +2591,10 @@ class AgenticReviewer(Reviewer):
                     )
                 for reference in finding.evidence_refs:
                     if isinstance(reference, dict) and reference.get("artifact_id"):
-                        resolve_evidence_artifact_ref(
-                            task_id, artifacts, reference, max_chars=0,
-                        )
+                        ArtifactRuntime(
+                            self.store, artifact_scope, source_revision,
+                            "logical-issue-restore", 0, "lead", "restore",
+                        ).resolve_ref(reference, max_chars=0)
                 restored_contributors.append({
                     "candidate_id": candidate_id,
                     "finding": copy.deepcopy(snapshot),
@@ -2850,11 +2689,13 @@ class AgenticReviewer(Reviewer):
                 issue.contributors, issue.representative_index,
             )
 
-    def _prepare_logical_issues(self, task_id, session, trace):
+    def _prepare_logical_issues(
+        self, task_id, session, trace, artifact_scope, source_revision="",
+    ):
         persisted = session.get("logical_issues")
         if persisted is not None:
             return self._restore_logical_issues(
-                task_id, persisted, session.get("evidence_artifacts") or {},
+                task_id, persisted, artifact_scope, source_revision,
             ), False
         downstream_started = bool(
             session.get("critic_pass1_complete")
@@ -2969,8 +2810,12 @@ class AgenticReviewer(Reviewer):
             return {}
         checkpoint = (loader(task_id) or {}).get("agentic-lead-session") or {}
         state = checkpoint.get("state") or {}
-        if state.get("protocol") != "lead-workers-v3":
+        if not state:
             return {}
+        if state.get("protocol") != "lead-workers-v4":
+            raise ExecutionConfigurationError(
+                "agentic checkpoint predates durable Artifact schema; start a fresh Review Task"
+            )
         if state.get("execution"):
             ledger.restore(state["execution"])
         session = dict(state.get("session") or {})
@@ -2986,7 +2831,7 @@ class AgenticReviewer(Reviewer):
         session["context_management"] = self.context_manager.summary(task_id)
         saver(
             task_id, "agentic-lead-session", {
-                "protocol": "lead-workers-v3", "session": session,
+                "protocol": "lead-workers-v4", "session": session,
                 "execution": ledger.summary(),
             }, "completed" if completed else "in_progress",
             max(1, len(ledger.model_calls)),

@@ -32,6 +32,7 @@ class AgentTool:
     description: str
     parameters: Dict[str, Any]
     handler: Callable[..., Any]
+    artifact_replay: bool = False
 
     def catalog_entry(self) -> Dict[str, Any]:
         return {
@@ -59,10 +60,14 @@ class ToolRegistry:
     def catalog(self) -> List[Dict[str, Any]]:
         return [self._tools[name].catalog_entry() for name in self.names()]
 
-    def invoke(self, name: str, arguments: Dict[str, Any]) -> Any:
+    def tool(self, name: str) -> AgentTool:
         tool = self._tools.get(name)
         if tool is None:
             raise ToolProtocolError("unknown agent tool: %s" % name)
+        return tool
+
+    def invoke(self, name: str, arguments: Dict[str, Any]) -> Any:
+        tool = self.tool(name)
         self._validate(tool.parameters, arguments)
         return tool.handler(**arguments)
 

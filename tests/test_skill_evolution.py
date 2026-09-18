@@ -186,7 +186,7 @@ class SkillEvolutionTests(unittest.TestCase):
             self.store.save_task_payload(task_id, diff)
         if snapshots:
             self.store.save_checkpoint(task_id, "agentic-lead-session", {
-                "protocol": "lead-workers-v3",
+                "protocol": "lead-workers-v4",
                 "session": {
                     "delegations": [{
                         "assignment_id": "security-1", "worker": "security",
@@ -206,6 +206,7 @@ class SkillEvolutionTests(unittest.TestCase):
                             "final_parsed_model_action": {"action": "final", "findings": []},
                         },
                     },
+                    "artifact_refs": {},
                 },
             })
         value = attribution or {
@@ -659,7 +660,7 @@ class SkillEvolutionTests(unittest.TestCase):
                 "accepted_findings": [], "revision_rounds": 0,
             })
             service.store.save_checkpoint(review["task_id"], "agentic-lead-session", {
-                "protocol": "lead-workers-v3", "session": pending,
+                "protocol": "lead-workers-v4", "session": pending,
                 "execution": state["execution"],
             }, "in_progress", 1)
 

@@ -319,6 +319,26 @@ class ContextManager:
             )
         if estimate_tokens(managed) > hard_input_limit:
             managed["context_policy"] = {"input_token_limit": hard_input_limit}
+        if estimate_tokens(managed) > hard_input_limit:
+            # Tool descriptions are advisory; names and schemas are the
+            # executable contract.  Keep that contract when a newly registered
+            # bounded tool would otherwise push the managed context over limit.
+            managed["available_tools"] = [
+                {
+                    "name": item.get("name", ""),
+                    "parameters": item.get("parameters") or {},
+                }
+                for item in managed["available_tools"]
+            ]
+        if estimate_tokens(managed) > hard_input_limit:
+            remaining = max(
+                128,
+                hard_input_limit
+                - estimate_tokens(managed["available_tools"])
+                - estimate_tokens(managed["observations"])
+                - 192,
+            )
+            managed["task"] = self._minimal_task(managed["task"], remaining)
         stats = {
             "estimated_input_tokens_before": original_tokens,
             "estimated_input_tokens_after": estimate_tokens(managed),

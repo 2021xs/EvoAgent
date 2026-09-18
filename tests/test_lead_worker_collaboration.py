@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from evoagent.agentic_core import (
     AgenticReviewer,
@@ -14,6 +15,7 @@ from evoagent.diff_parser import parse_unified_diff
 from evoagent.gates import FindingGate
 from evoagent.memory import MemoryManager
 from evoagent.models import Finding, Severity
+from evoagent.repository_tools import RepositoryToolSuite
 from evoagent.skills import AgentSkill
 from evoagent.store import TaskStore
 
@@ -371,6 +373,18 @@ class NormalWorkerToolClient(HierarchicalClient):
         raise AssertionError((role, task))
 
 
+class WorkerProcessCrash(BaseException):
+    pass
+
+
+class CrashAfterArtifactClient(NormalWorkerToolClient):
+    def complete_json(self, role, system, user, ledger=None, max_tokens=None):
+        managed = json.loads(user)
+        if role == "security" and managed.get("observations"):
+            raise WorkerProcessCrash("injected before worker checkpoint")
+        return super().complete_json(role, system, user, ledger, max_tokens)
+
+
 class LeadWorkerCollaborationTests(unittest.TestCase):
     def setUp(self):
         handle, self.path = tempfile.mkstemp(suffix=".db")
@@ -399,7 +413,7 @@ class LeadWorkerCollaborationTests(unittest.TestCase):
     def restore_lead_session(self, session):
         final = self.store.load_checkpoints("task")["agentic-lead-session"]
         self.store.save_checkpoint("task", "agentic-lead-session", {
-            "protocol": "lead-workers-v3",
+            "protocol": "lead-workers-v4",
             "session": copy.deepcopy(session),
             "execution": final["state"]["execution"],
         }, "in_progress", 1)
@@ -856,15 +870,17 @@ Bounded guidance.
         internal_ref = response["payload"]["evidence_refs"][0]
         final_ref = final_payload["evidence_response"]["evidence_refs"][0]
         self.assertIn("artifact_id", internal_ref)
-        self.assertIn("content_sha256", internal_ref)
+        self.assertIn("content_hash", internal_ref)
         self.assertNotIn("artifact_id", final_ref)
-        self.assertNotIn("content_sha256", final_ref)
+        self.assertNotIn("content_hash", final_ref)
         self.assertTrue(final_ref["content_available"])
-        artifacts = session["evidence_artifacts"]
-        self.assertIn(internal_ref["artifact_id"], artifacts)
+        artifact_refs = session["artifact_refs"]
+        self.assertIn(internal_ref["artifact_id"], artifact_refs)
+        artifact = self.store.get_artifact(
+            internal_ref["artifact_id"], "default", "org/repo", "task",
+        )
         self.assertEqual(
-            internal_ref["content_sha256"],
-            artifacts[internal_ref["artifact_id"]]["content_sha256"],
+            internal_ref["content_hash"], artifact["content_hash"],
         )
         self.assertNotIn("evidence_request", challenge["final_decision"])
         self.assertTrue(any(
@@ -882,6 +898,7 @@ Bounded guidance.
             self.assertNotIn(request["message_id"], rendered)
             self.assertNotIn(request["subject_id"], rendered)
             self.assertNotIn("evidence_artifacts", rendered)
+            self.assertNotIn("artifact_refs", rendered)
         semantic_memory = json.dumps(memory.recall(
             "default", "org/repo", "SEC-LEAD-REVISION",
         ))
@@ -890,10 +907,10 @@ Bounded guidance.
         self.assertNotIn(request["message_id"], semantic_memory)
         self.assertNotIn("artifact:", semantic_memory)
         self.assertNotIn("evidence_artifacts", semantic_memory)
+        self.assertNotIn("artifact_refs", semantic_memory)
         for _role, payload in client.payloads:
             self.assertNotIn("candidate_id", json.dumps(payload))
             self.assertNotIn("critic_challenge", json.dumps(payload))
-            self.assertNotIn(internal_ref["artifact_id"], json.dumps(payload))
         unrelated = [
             payload for role, payload in client.payloads
             if role != "critic" and payload.get("communication_type") is None
@@ -913,13 +930,18 @@ Bounded guidance.
         session = self.store.load_checkpoints("task")[
             "agentic-lead-session"
         ]["state"]["session"]
-        artifacts = session["evidence_artifacts"]
-        self.assertEqual(1, len(artifacts))
+        artifact_refs = session["artifact_refs"]
+        self.assertEqual(1, len(artifact_refs))
         finding = session["worker_results"]["security-1"]["findings"][0]
         reference = finding["evidence_refs"][0]
-        self.assertIn(reference["artifact_id"], artifacts)
+        self.assertIn(reference["artifact_id"], artifact_refs)
+        self.assertNotIn("content", reference)
+        self.assertNotIn("content", artifact_refs[reference["artifact_id"]])
+        artifact = self.store.get_artifact(
+            reference["artifact_id"], "default", "org/repo", "task",
+        )
         self.assertEqual(
-            "search_diff", artifacts[reference["artifact_id"]]["producer"]["tool"],
+            "search_diff", artifact["metadata"]["tool"],
         )
 
         resumed = NormalWorkerToolClient()
@@ -930,7 +952,40 @@ Bounded guidance.
         resumed_session = self.store.load_checkpoints("task")[
             "agentic-lead-session"
         ]["state"]["session"]
-        self.assertEqual(artifacts, resumed_session["evidence_artifacts"])
+        self.assertEqual(artifact_refs, resumed_session["artifact_refs"])
+
+    def test_crash_after_artifact_write_before_worker_checkpoint_reuses_tool_result(self):
+        original = RepositoryToolSuite.search_diff
+        invocations = {"count": 0}
+
+        def counted_search_diff(suite, query, limit=50):
+            invocations["count"] += 1
+            return original(suite, query, limit)
+
+        with patch.object(RepositoryToolSuite, "search_diff", counted_search_diff):
+            with self.assertRaises(WorkerProcessCrash):
+                AgenticReviewer(self.store, CrashAfterArtifactClient()).review_with_context(
+                    "task", DIFF, parse_unified_diff(DIFF), "org/repo",
+                )
+            self.assertEqual(1, invocations["count"])
+            checkpoint = self.store.load_checkpoints("task")["agentic-lead-session"]
+            self.assertNotIn(
+                "security-1", checkpoint["state"]["session"]["worker_results"]
+            )
+            with self.store._connect() as conn:
+                artifact_before = dict(conn.execute(
+                    "SELECT artifact_id,content_hash FROM artifacts"
+                ).fetchone())
+
+            AgenticReviewer(self.store, NormalWorkerToolClient()).review_with_context(
+                "task", DIFF, parse_unified_diff(DIFF), "org/repo",
+            )
+            self.assertEqual(1, invocations["count"])
+            with self.store._connect() as conn:
+                artifact_after = dict(conn.execute(
+                    "SELECT artifact_id,content_hash FROM artifacts"
+                ).fetchone())
+            self.assertEqual(artifact_before, artifact_after)
 
     def test_challenge_selects_one_lowest_routable_request_and_rejects_unroutable(self):
         client = EvidenceChallengeClient(request_indices=(0, 1), use_tool=False)
@@ -989,7 +1044,7 @@ Bounded guidance.
 
         def restore_and_run(status):
             self.store.save_checkpoint("task", "agentic-lead-session", {
-                "protocol": "lead-workers-v3",
+                "protocol": "lead-workers-v4",
                 "session": snapshots[status],
                 "execution": final_checkpoint["state"]["execution"],
             }, "in_progress", 1)
@@ -1183,6 +1238,17 @@ Bounded guidance.
         self.assertGreater(
             resumed.collaboration_summary("task")["execution"]["llm_calls"], 0
         )
+
+    def test_legacy_v3_checkpoint_fails_closed(self):
+        self.store.save_checkpoint("task", "agentic-lead-session", {
+            "protocol": "lead-workers-v3", "session": {}, "execution": {},
+        }, "in_progress", 1)
+        with self.assertRaisesRegex(
+            ExecutionConfigurationError, "predates durable Artifact schema",
+        ):
+            AgenticReviewer(self.store, HierarchicalClient()).review_with_context(
+                "task", DIFF, parse_unified_diff(DIFF), "org/repo",
+            )
 
     def test_gate_decisions_are_archived_for_future_agent_recall(self):
         memory = MemoryManager(self.store)

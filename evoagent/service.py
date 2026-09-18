@@ -3,9 +3,8 @@ import json
 import uuid
 from typing import Any, Dict, Optional
 
-from .agentic_core import (
-    AgenticReviewer, EvidenceArtifactError, resolve_evidence_artifact_ref,
-)
+from .agentic_core import AgenticReviewer
+from .artifacts import ArtifactError, ArtifactRuntime, ArtifactScope, artifact_from_store
 from .auth import AuthManager
 from .config import Settings
 from .context_manager import ContextManager
@@ -760,11 +759,10 @@ class ReviewService:
         value = str(path or "").replace("\\", "/").strip()
         return value[2:] if value.startswith(("a/", "b/")) else value
 
-    @classmethod
     def _relevant_worker_evidence(
-        cls, session: dict, expected: dict, task_id: str = "",
+        self, session: dict, expected: dict, task_id: str = "",
     ) -> tuple:
-        expected_path = cls._scope_path(expected.get("path"))
+        expected_path = self._scope_path(expected.get("path"))
         assignments = {}
         duplicate_ids = set()
         for value in session.get("delegations") or []:
@@ -779,7 +777,7 @@ class ReviewService:
             value for assignment_id, value in assignments.items()
             if assignment_id not in duplicate_ids
             and expected_path in {
-                cls._scope_path(path) for path in value.get("files") or []
+                self._scope_path(path) for path in value.get("files") or []
             }
         ]
         if len(relevant) != 1:
@@ -850,28 +848,38 @@ class ReviewService:
         if not expected_run_ids.issubset({item["run_id"] for item in selected}):
             return (), None
 
-        artifacts = session.get("evidence_artifacts") or {}
-        if not isinstance(artifacts, dict):
+        references = session.get("artifact_refs") or {}
+        if not isinstance(references, dict):
             return (), None
+        task = self.store.get(task_id) or {}
+        scope = ArtifactScope(
+            str(task.get("tenant_id") or "default"),
+            str(task.get("repository") or ""), task_id,
+        )
+        task_input = task.get("input") or {}
+        source_revision = str(
+            task_input.get("review_head_revision")
+            or task_input.get("head_sha")
+            or task_input.get("commit_sha")
+            or ""
+        )
+        resolver = ArtifactRuntime(
+            self.store, scope, source_revision,
+            "failure-attribution", 0, "service", "attribution",
+        )
         for snapshot in selected:
             projections = []
-            for artifact_id, artifact in artifacts.items():
-                producer = artifact.get("producer") if isinstance(artifact, dict) else None
-                if not isinstance(producer, dict) or str(
-                    producer.get("run_id") or ""
-                ) != snapshot["run_id"]:
+            for artifact_id, reference in references.items():
+                if not isinstance(reference, dict):
                     continue
-                reference = {
-                    "artifact_id": str(artifact_id),
-                    "content_sha256": artifact.get("content_sha256"),
-                    "evidence_id": artifact.get("evidence_id"),
-                    "tool": producer.get("tool"),
-                }
                 try:
-                    projections.append(resolve_evidence_artifact_ref(
-                        task_id, artifacts, reference, max_chars=2000,
+                    artifact = artifact_from_store(self.store.get_artifact(
+                        str(artifact_id), **scope.to_dict()
                     ))
-                except EvidenceArtifactError:
+                    if str(artifact.metadata.get("producer_run_id") or "") != snapshot["run_id"]:
+                        continue
+                    projections.append(resolver.resolve_ref(reference, max_chars=2000))
+                except ArtifactError:
                     return (), None
                 if len(projections) >= 12:
                     break
@@ -1003,7 +1011,7 @@ class ReviewService:
         ) or {}
         state = checkpoint.get("state") or {}
         session = state.get("session")
-        if state.get("protocol") != "lead-workers-v3" or not isinstance(session, dict):
+        if state.get("protocol") != "lead-workers-v4" or not isinstance(session, dict):
             return unknown()
         trace = session.get("candidate_trace")
         if not isinstance(trace, dict) or not isinstance(trace.get("candidates"), dict):

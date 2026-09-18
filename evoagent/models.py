@@ -63,7 +63,10 @@ class Finding:
             {
                 key: item
                 for key, item in ref.items()
-                if key not in {"artifact_id", "content_sha256"}
+                if key not in {
+                    "artifact_id", "artifact_type", "content_hash",
+                    "content_size_bytes", "logical_execution_key",
+                }
             }
             for ref in value.get("evidence_refs", [])
             if isinstance(ref, dict)

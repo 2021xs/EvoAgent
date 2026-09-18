@@ -8,8 +8,8 @@ from evoagent.agentic_core import (
     AgenticReviewer,
     LogicalIssueError,
     MAX_LOGICAL_ISSUE_MODEL_EVIDENCE_REFS,
-    capture_tool_evidence_artifact,
 )
+from evoagent.artifacts import Artifact, ArtifactError, ArtifactScope
 from evoagent.diff_parser import parse_unified_diff
 from evoagent.gates import FindingGate
 from evoagent.models import Finding, Severity
@@ -191,32 +191,35 @@ class LogicalIssueTests(unittest.TestCase):
         self.assertEqual([projection], FindingGate().apply([projection], parsed).accepted)
 
     def test_restore_integrity_and_resume_are_stable(self):
-        artifacts = {}
-        reference = capture_tool_evidence_artifact(
-            "task", artifacts,
-            {"role": "security", "run_id": "security-1", "step": 1,
-             "tool": "read_file"},
+        scope = ArtifactScope("default", "org/repo", "task")
+        artifact = Artifact.for_tool_result(
+            scope, "security", "revision", "logical:1",
             {"evidence_id": "read:e1", "tool": "read_file", "output": "fact"},
+            "read:e1", {"tool": "read_file", "producer_run_id": "security-1"},
         )
+        self.store.put_artifact(artifact.to_dict())
+        reference = artifact.ref().to_dict()
         issue = self.reviewer._aggregate_logical_issues(
             "task", [finding("C1", 0.9, refs=[reference])],
             {"candidates": {}, "merge_lineage": []},
         )[0]
         persisted = [issue.to_dict()]
         restored = self.reviewer._restore_logical_issues(
-            "task", copy.deepcopy(persisted), artifacts,
+            "task", copy.deepcopy(persisted), scope, "revision",
         )
         self.assertEqual(persisted, [item.to_dict() for item in restored])
 
         corrupt = copy.deepcopy(persisted)
         corrupt[0]["contributors"][0]["finding"]["line"] = 2
         with self.assertRaisesRegex(LogicalIssueError, "identity mismatch"):
-            self.reviewer._restore_logical_issues("task", corrupt, artifacts)
+            self.reviewer._restore_logical_issues("task", corrupt, scope, "revision")
 
         corrupt = copy.deepcopy(persisted)
-        corrupt[0]["merged_evidence_refs"][0]["content_sha256"] = "0" * 64
-        with self.assertRaises(LogicalIssueError):
-            self.reviewer._restore_logical_issues("task", corrupt, artifacts)
+        corrupt[0]["contributors"][0]["finding"]["evidence_refs"][0][
+            "content_hash"
+        ] = "0" * 64
+        with self.assertRaises(ArtifactError):
+            self.reviewer._restore_logical_issues("task", corrupt, scope, "revision")
 
     def test_scanner_and_worker_duplicates_are_one_private_issue_one_public_finding(self):
         client = DuplicateWorkerClient()

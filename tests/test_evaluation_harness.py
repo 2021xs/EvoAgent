@@ -28,7 +28,7 @@ class EndToEndEvaluationTests(unittest.TestCase):
         self.assertEqual(2, len(holdout_repos))
         self.assertFalse(validation_repos & holdout_repos)
         self.assertEqual(
-            {"offline-fixture"},
+            {"synthetic-controlled"},
             {item["source"]["kind"] for item in cases},
         )
 

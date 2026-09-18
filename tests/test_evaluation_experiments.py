@@ -135,6 +135,15 @@ class EvaluationExperimentTests(unittest.TestCase):
             for item in cases for finding in item["expected_findings"]
         ))
 
+    def test_controlled_adapter_rejects_mislabelled_provenance(self):
+        cases = load_controlled_pr_cases()
+        cases[0] = {
+            **cases[0],
+            "source": {**cases[0]["source"], "kind": "offline-fixture"},
+        }
+        with self.assertRaisesRegex(ValueError, "only synthetic-controlled data"):
+            prepare_controlled_experiment_cases(cases)
+
     def test_controlled_accuracy_reports_full_metric_contract(self):
         report = AccuracyExperimentSuite().run()
         self.assertTrue(report["controlled"]["dataset_contract_passed"])

@@ -50,7 +50,7 @@ def prepare_controlled_experiment_cases(cases: Iterable[dict]) -> List[dict]:
     """Adapt the checked-in 100-case corpus for three-way experiments.
 
     Repositories 1-6 become train, 7-8 validation and 9-10 holdout. Human-only
-    production gates remain closed because this is an offline fixture corpus.
+    production gates remain closed because this is a synthetic controlled corpus.
     """
     cases = [dict(item) for item in cases]
     repositories = sorted({str(item["repository"]) for item in cases})
@@ -65,8 +65,10 @@ def prepare_controlled_experiment_cases(cases: Iterable[dict]) -> List[dict]:
     adapted = []
     for original in cases:
         source_kind = str((original.get("source") or {}).get("kind", ""))
-        if source_kind != "offline-fixture":
-            raise ValueError("controlled experiment adapter accepts only offline-fixture data")
+        if source_kind != "synthetic-controlled":
+            raise ValueError(
+                "controlled experiment adapter accepts only synthetic-controlled data"
+            )
         item = dict(original)
         item["split"] = by_repository[str(item["repository"])]
         item["expected_findings"] = [
@@ -233,9 +235,9 @@ class AccuracyExperimentSuite:
                 {item["repository"] for item in cases if item["split"] == "validation"}
                 & {item["repository"] for item in cases if item["split"] == "holdout"}
             ),
-            "offline_fixture_provenance": {
+            "synthetic_controlled_provenance": {
                 str((item.get("source") or {}).get("kind")) for item in cases
-            } == {"offline-fixture"},
+            } == {"synthetic-controlled"},
         }
         return {
             "dataset_contract": contract,

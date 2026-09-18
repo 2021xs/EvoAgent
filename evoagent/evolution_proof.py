@@ -4,7 +4,7 @@ This module deliberately uses a deterministic prompt-policy reviewer.  It proves
 that EvoAgent's feedback -> prompt version -> replay -> holdout -> activation
 loop changes agent behavior under controlled conditions. It does not claim that
 an unconfigured external LLM improved, and reports produced here are marked as
-offline fixtures.
+synthetic controlled evidence.
 """
 
 import hashlib
@@ -31,13 +31,85 @@ DEFAULT_PROMPT_DATASET = os.path.abspath(os.path.join(
 ))
 
 
+_PROMPT_EVOLUTION_RISKS = (
+    ("SEC-PATH-TRAVERSAL", "high", "value = open(base / user_path)"),
+    ("SEC-YAML-LOAD", "high", "value = yaml.load(payload)"),
+    ("SEC-WEAK-HASH", "medium", "value = hashlib.md5(payload).hexdigest()"),
+    ("SEC-INSECURE-TEMPFILE", "medium", "value = tempfile.mktemp()"),
+)
+
+_PROMPT_EVOLUTION_CLEAN_LINES = (
+    "value = base / validated_name",
+    "value = yaml.safe_load(payload)",
+    "value = hashlib.sha256(payload).hexdigest()",
+    "value = tempfile.NamedTemporaryFile()",
+    "value = secrets.token_hex(16)",
+    "value = min(max(limit, 1), 100)",
+    "value = user.is_admin",
+    "value = request.cookies.get(\"sid\")",
+    "value = payload.strip()",
+)
+
+
+def build_prompt_evolution_cases() -> List[dict]:
+    """Build the deterministic synthetic corpus checked into evaluation_data.
+
+    The corpus has 13 cases for each of ten repository identities. Repositories
+    1-8 are validation and 9-10 are holdout. Each repository has four labelled
+    context-rule risks and nine clean changes, so baseline feedback contains
+    exactly 32 validation misses. Repository-level separation lets the evolved
+    prompt replay the learned rule focus on unseen holdout repositories without
+    implying production-data provenance.
+    """
+    cases = []
+    sequence = 0
+    templates = tuple(
+        (rule_id, severity, line) for rule_id, severity, line in _PROMPT_EVOLUTION_RISKS
+    ) + tuple((None, None, line) for line in _PROMPT_EVOLUTION_CLEAN_LINES)
+    for repository_index in range(1, 11):
+        repository = "controlled/prompt-repo-%02d" % repository_index
+        split = "validation" if repository_index <= 8 else "holdout"
+        for template_index, (rule_id, severity, added_line) in enumerate(templates, 1):
+            sequence += 1
+            path = "src/case_%02d.py" % template_index
+            expected = []
+            if rule_id:
+                expected.append({
+                    "path": path,
+                    "start_line": 1,
+                    "end_line": 1,
+                    "rule_id": rule_id,
+                    "cwe": RULE_TO_CWE[rule_id],
+                    "severity": severity,
+                    "should_comment": True,
+                })
+            cases.append({
+                "schema_version": 1,
+                "id": "prompt-pr-%04d" % sequence,
+                "repository": repository,
+                "pull_request": 3000 + sequence,
+                "split": split,
+                "source": {
+                    "kind": "synthetic-controlled",
+                    "generator": "prompt-evolution-v1",
+                    "public_url": None,
+                },
+                "diff": (
+                    "--- a/%s\n+++ b/%s\n@@ -1 +1 @@\n-old_value = None\n+%s\n"
+                    % (path, path, added_line)
+                ),
+                "expected_findings": expected,
+            })
+    return cases
+
+
 def load_prompt_evolution_cases(dataset_path: str = DEFAULT_PROMPT_DATASET) -> List[dict]:
     """Load the checked-in 130-case prompt replay corpus."""
     return load_jsonl(dataset_path)
 
 
 def generate_prompt_evolution_cases() -> List[dict]:
-    """Backward-compatible name for loading the pre-generated corpus."""
+    """Backward-compatible name for loading the checked-in generated corpus."""
     return load_prompt_evolution_cases()
 
 

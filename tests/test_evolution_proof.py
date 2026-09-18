@@ -3,6 +3,7 @@ import tempfile
 import unittest
 
 from evoagent.evolution_proof import (
+    build_prompt_evolution_cases,
     generate_prompt_evolution_cases,
     run_prompt_evolution_proof,
     write_jsonl,
@@ -12,7 +13,12 @@ from evoagent.evolution_proof import (
 class PromptEvolutionProofTests(unittest.TestCase):
     def test_feedback_evolution_improves_repository_disjoint_holdout(self):
         cases = generate_prompt_evolution_cases()
+        self.assertEqual(build_prompt_evolution_cases(), cases)
         self.assertEqual(130, len(cases))
+        self.assertEqual(
+            {"synthetic-controlled"},
+            {case["source"]["kind"] for case in cases},
+        )
         validation_repositories = {
             case["repository"] for case in cases if case["split"] == "validation"
         }

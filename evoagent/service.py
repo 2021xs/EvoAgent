@@ -37,6 +37,7 @@ from .store import utc_now
 from .task_queue import PermanentTaskError, TaskQueue
 from .rollout import ReleaseManager
 from .verifier import RepairVerifier
+from .workflow_events import CI_TERMINAL_PHASES, WorkflowEvent, canonical_ci_authority
 
 
 ROOT_CAUSE_ATTRIBUTION_PROMPT = """You are a bounded failure-attribution classifier.
@@ -624,6 +625,34 @@ class ReviewService:
         result["will_post_to_github"] = self.settings.auto_post_review
         return result
 
+    def handle_github_check_suite(
+        self, payload: Dict[str, Any], delivery_id: str,
+        payload_sha256: str, tenant_id: str = "",
+    ) -> Dict[str, Any]:
+        """Persist and apply one verified GitHub check_suite delivery."""
+        installation_id = (payload.get("installation") or {}).get("id")
+        tenant_id = tenant_id or (
+            self.store.installation_tenant(installation_id) if installation_id else None
+        ) or self.settings.default_tenant_id
+        event = WorkflowEvent.from_github_check_suite(payload, tenant_id, utc_now())
+        self._authorize_repository(tenant_id, event.repository)
+        claimed = self.store.claim_webhook(
+            delivery_id, tenant_id, "check_suite", payload_sha256,
+        )
+        # A transport claim can survive a crash before logical-event persistence.
+        # Therefore redelivery still goes through durable logical idempotency.
+        applied = self.store.record_and_apply_workflow_event(event.to_dict())
+        self.store.complete_webhook(delivery_id, applied.get("correlated_task_id"))
+        metrics.inc("workflow_events_total")
+        return {
+            "event_id": event.event_id,
+            "logical_event_key": event.logical_event_key,
+            "processing_status": applied["processing_status"],
+            "processing_result": applied["processing_result"],
+            "task_id": applied.get("correlated_task_id"),
+            "duplicate_delivery": not claimed,
+        }
+
     @staticmethod
     def _github_revision(value: Any, field: str) -> str:
         revision = str(value or "").strip()
@@ -678,6 +707,15 @@ class ReviewService:
         )
         workflow_state = dict(checkpoint.get("state") or {})
         attempt = int(checkpoint.get("attempt") or 0) + 1
+        phase = str(workflow_state.get("phase") or "")
+        if phase == "WAITING_FOR_CI" or phase in CI_TERMINAL_PHASES:
+            return dict(workflow_state.get("result") or {})
+        ci_authority = None
+        if isinstance(self.fixer, VerifiedPatchFixer):
+            ci_authority = canonical_ci_authority(
+                getattr(self.settings, "github_ci_app_id", ""),
+                getattr(self.settings, "github_ci_app_slug", ""),
+            )
 
         def persist_autofix(state: dict, completed: bool) -> None:
             self.store.save_checkpoint(
@@ -702,6 +740,25 @@ class ReviewService:
             reviewed_revision=reviewed_revision,
             task_created_at=str(task.get("created_at") or ""),
         )
+        checkpoint = (self.store.load_checkpoints(task_id) or {}).get(
+            "autofix-execution", {}
+        )
+        workflow_state = dict(checkpoint.get("state") or {})
+        if workflow_state.get("phase") == "PR_CREATED":
+            waiting_result = dict(result)
+            waiting_result.update({
+                "status": "waiting-for-ci", "published": True,
+                "commit_sha": workflow_state["commit_sha"],
+                "note": "The verified draft was published; AutoFix is durably waiting for CI.",
+            })
+            workflow_state = self.store.suspend_autofix_for_ci(
+                task_id, actual_tenant, task["repository"],
+                str(workflow_state["commit_sha"]),
+                str(workflow_state["repair_branch"]),
+                int(workflow_state["pr_number"]), ci_authority,
+                waiting_result, attempt,
+            )
+            result = dict(workflow_state["result"])
         metrics.inc("fix_runs_total")
         return result
 

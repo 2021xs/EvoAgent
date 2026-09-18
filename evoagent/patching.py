@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 from .llm import JsonChatClient
 from .telemetry import ExecutionLedger
 from .verifier import RepairVerifier
+from .workflow_events import AUTOFIX_TERMINAL_PHASES, transition_autofix_state
 
 
 PATCH_PROMPT = """You are the Fix Agent. Produce one minimal unified diff that fixes the supplied
@@ -137,8 +138,9 @@ class VerifiedPatchFixer:
         report_hash = self._hash_json(report)
 
         def save(phase: str, completed: bool = False, **updates) -> None:
-            state.update(updates)
-            state["phase"] = phase
+            value = transition_autofix_state(state, phase, **updates)
+            state.clear()
+            state.update(value)
             if persist:
                 persist(dict(state), completed)
 
@@ -154,7 +156,7 @@ class VerifiedPatchFixer:
             for key, value in expected.items():
                 if state.get(key) != value:
                     raise ValueError("AutoFix checkpoint identity mismatch: %s" % key)
-            if state.get("phase") in {"BLOCKED", "SUGGESTION_ONLY", "STALE_SOURCE"}:
+            if state.get("phase") in AUTOFIX_TERMINAL_PHASES:
                 return dict(state["result"])
         else:
             pull = client.get_pull_request(repository, pull_request)
@@ -355,7 +357,7 @@ class VerifiedPatchFixer:
                 "note": "Verified patch was published only as a draft pull request.",
             }
             save(
-                "PR_CREATED", True, pr_number=int(draft["number"]),
+                "PR_CREATED", False, pr_number=int(draft["number"]),
                 pr_url=draft.get("html_url"), result=result,
             )
             return result
@@ -449,7 +451,7 @@ class SuggestionOnlyFixer:
             "suggestions": [item.get("fix", "") for item in report.get("findings", [])],
             "note": "No model is configured. Suggestions are not described as an automatic fix.",
         }
-        state.update({"phase": "SUGGESTION_ONLY", "result": result})
+        state = transition_autofix_state(state, "SUGGESTION_ONLY", result=result)
         if persist:
             persist(state, True)
         return result

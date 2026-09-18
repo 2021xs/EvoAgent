@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from evoagent.models import Finding, ReviewReport, Severity, TaskState, TraceEvent
 from evoagent.patching import VerifiedPatchFixer
@@ -163,6 +164,9 @@ class AutoFixResumeTests(unittest.TestCase):
         self.service.store = self.store
         self.service.github = self.github
         self.service.fixer = VerifiedPatchFixer(self.model, self.verifier)
+        self.service.settings = SimpleNamespace(
+            github_ci_app_id="42", github_ci_app_slug="ci",
+        )
         self.task_id = "11111111-2222-3333-4444-555555555555"
         self._create_task(reviewed_revision=SOURCE)
 
@@ -222,7 +226,7 @@ class AutoFixResumeTests(unittest.TestCase):
         second = self._fix()
 
         self.assertEqual(first, second)
-        self.assertEqual("verified-draft", first["status"])
+        self.assertEqual("waiting-for-ci", first["status"])
         self.assertEqual(SOURCE, first["source_sha"])
         self.assertTrue(self.github.file_refs)
         self.assertEqual({SOURCE}, {ref for _path, ref in self.github.file_refs})
@@ -234,8 +238,8 @@ class AutoFixResumeTests(unittest.TestCase):
         self.assertEqual("SUCCESS", task["state"])
         self.assertEqual(before_report, task["report"])
         checkpoint = self.store.load_checkpoints(self.task_id)["autofix-execution"]
-        self.assertEqual("PR_CREATED", checkpoint["state"]["phase"])
-        self.assertEqual("completed", checkpoint["status"])
+        self.assertEqual("WAITING_FOR_CI", checkpoint["state"]["phase"])
+        self.assertEqual("in_progress", checkpoint["status"])
 
     def test_review_revision_mismatch_persists_stale_without_remote_write(self):
         self.github.current_head = NEW_SOURCE
@@ -278,7 +282,7 @@ class AutoFixResumeTests(unittest.TestCase):
 
         result = self._fix()
 
-        self.assertEqual("verified-draft", result["status"])
+        self.assertEqual("waiting-for-ci", result["status"])
         self.assertEqual(1, self.model.calls)
 
     def test_resume_after_verified_skips_verification(self):
@@ -358,7 +362,7 @@ class AutoFixResumeTests(unittest.TestCase):
 
         result = self._fix()
 
-        self.assertEqual("verified-draft", result["status"])
+        self.assertEqual("waiting-for-ci", result["status"])
         self.assertEqual(1, self.github.branch_creates)
         self.assertEqual(1, self.github.pr_creates)
 

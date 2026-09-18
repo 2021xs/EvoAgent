@@ -86,6 +86,8 @@ class Settings:
     skills_dir: str = "skills"
     github_app_id: str = ""
     github_app_slug: str = ""
+    github_ci_app_id: str = ""
+    github_ci_app_slug: str = ""
     github_private_key_path: str = ""
     public_base_url: str = "http://127.0.0.1:8080"
     llm_provider: str = "local"
@@ -251,6 +253,8 @@ class Settings:
             skills_dir=os.getenv("EVOAGENT_SKILLS_DIR", "skills"),
             github_app_id=os.getenv("EVOAGENT_GITHUB_APP_ID", ""),
             github_app_slug=os.getenv("EVOAGENT_GITHUB_APP_SLUG", ""),
+            github_ci_app_id=os.getenv("EVOAGENT_GITHUB_CI_APP_ID", ""),
+            github_ci_app_slug=os.getenv("EVOAGENT_GITHUB_CI_APP_SLUG", ""),
             github_private_key_path=os.getenv("EVOAGENT_GITHUB_PRIVATE_KEY_PATH", ""),
             public_base_url=os.getenv("EVOAGENT_PUBLIC_BASE_URL", "http://127.0.0.1:8080").rstrip("/"),
             llm_provider=os.getenv("EVOAGENT_LLM_PROVIDER", "local"),

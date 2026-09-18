@@ -14,6 +14,13 @@ from .artifacts import (
 )
 from .models import ReviewReport, TaskState, TraceEvent
 from .releases import ReleaseBundle, ReleaseNotFound
+from .workflow_events import (
+    AUTOFIX_CHECKPOINT,
+    CI_TERMINAL_PHASES,
+    canonical_ci_authority,
+    check_suite_matches_authority,
+    transition_autofix_state,
+)
 
 
 def utc_now() -> str:
@@ -224,6 +231,60 @@ class TaskStore:
                     task_id TEXT,
                     received_at TEXT NOT NULL
                 )"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS workflow_events (
+                    event_id TEXT PRIMARY KEY,
+                    logical_event_key TEXT NOT NULL UNIQUE,
+                    external_event_key TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    repository TEXT NOT NULL,
+                    external_object_id TEXT NOT NULL,
+                    head_sha TEXT NOT NULL,
+                    external_status TEXT NOT NULL,
+                    conclusion TEXT NOT NULL,
+                    outcome TEXT,
+                    received_at TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
+                    policy_result TEXT NOT NULL,
+                    processing_status TEXT NOT NULL DEFAULT 'PENDING',
+                    processing_result TEXT NOT NULL DEFAULT '',
+                    correlated_task_id TEXT,
+                    applied_transition TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                )"""
+            )
+            conn.execute(
+                """CREATE INDEX IF NOT EXISTS idx_workflow_events_correlation
+                    ON workflow_events(tenant_id,repository,head_sha,processing_status)"""
+            )
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS autofix_correlations (
+                    task_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    repository TEXT NOT NULL,
+                    commit_sha TEXT NOT NULL,
+                    repair_branch TEXT NOT NULL,
+                    pr_number INTEGER NOT NULL,
+                    ci_authority_app_id TEXT NOT NULL DEFAULT '',
+                    ci_authority_app_slug TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES tasks(id)
+                )"""
+            )
+            conn.execute(
+                """CREATE INDEX IF NOT EXISTS idx_autofix_correlation_commit
+                    ON autofix_correlations(tenant_id,repository,commit_sha)"""
+            )
+            self._ensure_column(
+                conn, "autofix_correlations", "ci_authority_app_id",
+                "TEXT NOT NULL DEFAULT ''",
+            )
+            self._ensure_column(
+                conn, "autofix_correlations", "ci_authority_app_slug",
+                "TEXT NOT NULL DEFAULT ''",
             )
             conn.execute(
                 """CREATE TABLE IF NOT EXISTS users (
@@ -1206,6 +1267,249 @@ class TaskStore:
                 "SELECT * FROM webhook_deliveries WHERE delivery_id=?", (delivery_id,)
             ).fetchone()
         return dict(row) if row else None
+
+    @staticmethod
+    def _workflow_event_from_row(row) -> Dict[str, Any]:
+        value = dict(row)
+        value["metadata"] = json.loads(value.pop("metadata_json"))
+        return value
+
+    def _apply_workflow_event_tx(self, conn, event_id: str, fault_injector=None) -> Dict[str, Any]:
+        row = conn.execute(
+            "SELECT * FROM workflow_events WHERE event_id=?", (event_id,),
+        ).fetchone()
+        if not row:
+            raise ValueError("WORKFLOW_EVENT_UNSUPPORTED: event does not exist")
+        event = self._workflow_event_from_row(row)
+        if event["processing_status"] in {"APPLIED", "IGNORED", "CONFLICT", "AMBIGUOUS"}:
+            return event
+        now = utc_now()
+        if not event.get("outcome"):
+            conn.execute(
+                "UPDATE workflow_events SET processing_status='IGNORED',"
+                "processing_result=?,updated_at=? WHERE event_id=?",
+                (event["policy_result"], now, event_id),
+            )
+            row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+            return self._workflow_event_from_row(row)
+
+        scoped_correlations = conn.execute(
+            "SELECT * FROM autofix_correlations WHERE tenant_id=? AND repository=? "
+            "AND commit_sha=? ORDER BY task_id",
+            (event["tenant_id"], event["repository"], event["head_sha"]),
+        ).fetchall()
+        if not scoped_correlations:
+            conn.execute(
+                "UPDATE workflow_events SET processing_status='PENDING',"
+                "processing_result='WORKFLOW_EVENT_UNMATCHED',updated_at=? WHERE event_id=?",
+                (now, event_id),
+            )
+            row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+            return self._workflow_event_from_row(row)
+        correlations = [
+            item for item in scoped_correlations
+            if check_suite_matches_authority(
+                event.get("metadata") or {}, item["ci_authority_app_id"],
+                item["ci_authority_app_slug"],
+            )
+        ]
+        if not correlations:
+            conn.execute(
+                "UPDATE workflow_events SET processing_status='IGNORED',"
+                "processing_result='WORKFLOW_EVENT_NON_AUTHORITATIVE',updated_at=? "
+                "WHERE event_id=?", (now, event_id),
+            )
+            row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+            return self._workflow_event_from_row(row)
+        if len(correlations) != 1:
+            conn.execute(
+                "UPDATE workflow_events SET processing_status='AMBIGUOUS',"
+                "processing_result='WORKFLOW_CORRELATION_AMBIGUOUS',updated_at=? "
+                "WHERE event_id=?", (now, event_id),
+            )
+            row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+            return self._workflow_event_from_row(row)
+
+        task_id = str(correlations[0]["task_id"])
+        checkpoint = conn.execute(
+            "SELECT * FROM checkpoints WHERE task_id=? AND node=?",
+            (task_id, AUTOFIX_CHECKPOINT),
+        ).fetchone()
+        if not checkpoint:
+            result = "WORKFLOW_TRANSITION_INVALID"
+            status = "CONFLICT"
+        else:
+            state = json.loads(checkpoint["state_json"])
+            phase = str(state.get("phase") or "")
+            target = str(event["outcome"])
+            if phase == "WAITING_FOR_CI":
+                result_value = dict(state.get("result") or {})
+                result_value.update({
+                    "status": "ci-passed" if target == "CI_PASSED" else "ci-failed",
+                    "ci_conclusion": event["conclusion"],
+                    "ci_event_id": event_id,
+                    "note": (
+                        "The AutoFix draft passed its correlated CI check suite."
+                        if target == "CI_PASSED" else
+                        "The AutoFix draft failed its correlated CI check suite."
+                    ),
+                })
+                next_state = transition_autofix_state(
+                    state, target, result=result_value,
+                    ci_event_id=event_id,
+                    ci_external_object_id=event["external_object_id"],
+                    ci_conclusion=event["conclusion"], ci_completed_at=now,
+                )
+                conn.execute(
+                    "UPDATE checkpoints SET status='completed',state_json=?,error=NULL,"
+                    "updated_at=? WHERE task_id=? AND node=?",
+                    (json.dumps(next_state, ensure_ascii=False), now, task_id, AUTOFIX_CHECKPOINT),
+                )
+                if fault_injector:
+                    fault_injector("after_workflow_transition")
+                result = target
+                status = "APPLIED"
+            elif phase == target:
+                result = "WORKFLOW_EVENT_DUPLICATE"
+                status = "APPLIED"
+            elif phase == "PR_CREATED":
+                conn.execute(
+                    "UPDATE workflow_events SET processing_status='PENDING',"
+                    "processing_result='WORKFLOW_WAIT_NOT_DURABLE',correlated_task_id=?,"
+                    "updated_at=? WHERE event_id=?", (task_id, now, event_id),
+                )
+                row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+                return self._workflow_event_from_row(row)
+            elif phase in CI_TERMINAL_PHASES:
+                result = "WORKFLOW_EVENT_CONFLICT"
+                status = "CONFLICT"
+            else:
+                result = "WORKFLOW_TRANSITION_INVALID"
+                status = "CONFLICT"
+        conn.execute(
+            "UPDATE workflow_events SET processing_status=?,processing_result=?,"
+            "correlated_task_id=?,applied_transition=?,updated_at=? WHERE event_id=?",
+            (status, result, task_id, event.get("outcome") if status == "APPLIED" else "", now, event_id),
+        )
+        row = conn.execute("SELECT * FROM workflow_events WHERE event_id=?", (event_id,)).fetchone()
+        return self._workflow_event_from_row(row)
+
+    def record_and_apply_workflow_event(
+        self, event: Dict[str, Any], fault_injector=None,
+    ) -> Dict[str, Any]:
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "INSERT OR IGNORE INTO workflow_events(event_id,logical_event_key,"
+                "external_event_key,source,event_type,tenant_id,repository,external_object_id,"
+                "head_sha,external_status,conclusion,outcome,received_at,metadata_json,"
+                "policy_result,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    event["event_id"], event["logical_event_key"], event["external_event_key"],
+                    event["source"], event["event_type"], event["tenant_id"],
+                    event["repository"], event["external_object_id"], event["head_sha"],
+                    event["external_status"], event["conclusion"], event.get("outcome"),
+                    event["received_at"], json.dumps(event.get("metadata") or {}, ensure_ascii=False),
+                    event["policy_result"], utc_now(),
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM workflow_events WHERE logical_event_key=?",
+                (event["logical_event_key"],),
+            ).fetchone()
+            if not row or str(row["event_id"]) != str(event["event_id"]):
+                raise ValueError("WORKFLOW_EVENT_CONFLICT: logical identity collision")
+            return self._apply_workflow_event_tx(conn, str(row["event_id"]), fault_injector)
+
+    def suspend_autofix_for_ci(
+        self, task_id: str, tenant_id: str, repository: str, commit_sha: str,
+        repair_branch: str, pr_number: int, ci_authority: Dict[str, Any],
+        waiting_result: Dict[str, Any], attempt: int,
+        fault_injector=None,
+    ) -> Dict[str, Any]:
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            task = conn.execute(
+                "SELECT tenant_id,repository FROM tasks WHERE id=?", (task_id,),
+            ).fetchone()
+            if not task or task["tenant_id"] != tenant_id or task["repository"] != repository:
+                raise ValueError("AutoFix correlation task scope mismatch")
+            checkpoint = conn.execute(
+                "SELECT * FROM checkpoints WHERE task_id=? AND node=?",
+                (task_id, AUTOFIX_CHECKPOINT),
+            ).fetchone()
+            if not checkpoint:
+                raise ValueError("AutoFix checkpoint is missing before CI suspension")
+            current = json.loads(checkpoint["state_json"])
+            phase = str(current.get("phase") or "")
+            existing = conn.execute(
+                "SELECT * FROM autofix_correlations WHERE task_id=?", (task_id,),
+            ).fetchone()
+            authority = canonical_ci_authority(
+                ci_authority.get("github_app_id"), ci_authority.get("github_app_slug"),
+            )
+            identity = (
+                tenant_id, repository, commit_sha, repair_branch, int(pr_number),
+                authority["github_app_id"], authority["github_app_slug"],
+            )
+            if existing:
+                stored = (
+                    existing["tenant_id"], existing["repository"], existing["commit_sha"],
+                    existing["repair_branch"], int(existing["pr_number"]),
+                    existing["ci_authority_app_id"], existing["ci_authority_app_slug"],
+                )
+                if stored != identity:
+                    raise ValueError("AutoFix durable correlation identity mismatch")
+            else:
+                conn.execute(
+                    "INSERT INTO autofix_correlations(task_id,tenant_id,repository,commit_sha,"
+                    "repair_branch,pr_number,ci_authority_app_id,ci_authority_app_slug,created_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)",
+                    (task_id, *identity, utc_now()),
+                )
+            if phase == "PR_CREATED":
+                current = transition_autofix_state(
+                    current, "WAITING_FOR_CI", result=waiting_result,
+                    waiting_since=utc_now(), ci_authority=authority,
+                )
+                conn.execute(
+                    "UPDATE checkpoints SET status='in_progress',attempt=?,state_json=?,"
+                    "error=NULL,updated_at=? WHERE task_id=? AND node=?",
+                    (attempt, json.dumps(current, ensure_ascii=False), utc_now(), task_id, AUTOFIX_CHECKPOINT),
+                )
+            elif phase not in {"WAITING_FOR_CI", *CI_TERMINAL_PHASES}:
+                raise ValueError("WORKFLOW_TRANSITION_INVALID: cannot suspend from %s" % phase)
+            pending = conn.execute(
+                "SELECT event_id FROM workflow_events WHERE tenant_id=? AND repository=? "
+                "AND head_sha=? AND processing_status='PENDING' ORDER BY received_at,event_id",
+                (tenant_id, repository, commit_sha),
+            ).fetchall()
+            for event_row in pending:
+                self._apply_workflow_event_tx(
+                    conn, str(event_row["event_id"]), fault_injector,
+                )
+            checkpoint = conn.execute(
+                "SELECT state_json FROM checkpoints WHERE task_id=? AND node=?",
+                (task_id, AUTOFIX_CHECKPOINT),
+            ).fetchone()
+            return json.loads(checkpoint["state_json"])
+
+    def get_workflow_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM workflow_events WHERE event_id=?", (event_id,),
+            ).fetchone()
+        return self._workflow_event_from_row(row) if row else None
+
+    def list_autofix_correlations(
+        self, tenant_id: str, repository: str, commit_sha: str,
+    ) -> list:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM autofix_correlations WHERE tenant_id=? AND repository=? "
+                "AND commit_sha=? ORDER BY task_id", (tenant_id, repository, commit_sha),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def create_user(
         self, user_id: str, username: str, password_hash: str,

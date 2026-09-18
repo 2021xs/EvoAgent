@@ -369,7 +369,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 return
             if path == "/webhooks/github":
-                if self.headers.get("X-GitHub-Event", "") != "pull_request":
+                event_type = self.headers.get("X-GitHub-Event", "")
+                if event_type not in {"pull_request", "check_suite"}:
                     self._send_json(202, {"ignored": True, "reason": "unsupported GitHub event"})
                     return
                 if not self.settings.github_webhook_secret:
@@ -380,21 +381,28 @@ class ApiHandler(BaseHTTPRequestHandler):
                     self._send_json(401, {"error": "invalid webhook signature"})
                     return
                 payload = self._read_json(body)
-                updated_at = (payload.get("pull_request") or {}).get("updated_at")
+                updated_at = (
+                    (payload.get("pull_request") or {}).get("updated_at")
+                    if event_type == "pull_request" else
+                    (payload.get("check_suite") or {}).get("updated_at")
+                )
                 if updated_at:
                     try:
                         event_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
                     except ValueError:
-                        raise ValueError("invalid pull_request.updated_at")
+                        raise ValueError("invalid GitHub event updated_at")
                     age = abs((datetime.now(timezone.utc) - event_time).total_seconds())
                     if age > self.settings.webhook_max_age_seconds:
                         self._send_json(409, {"error": "webhook is outside the replay window"})
                         return
                 delivery_id = self.headers.get("X-GitHub-Delivery", "")
                 digest = hashlib.sha256(body).hexdigest()
-                self._send_json(202, self.service.handle_github_pull_request(
-                    payload, delivery_id, digest
-                ))
+                handler = (
+                    self.service.handle_github_pull_request
+                    if event_type == "pull_request" else
+                    self.service.handle_github_check_suite
+                )
+                self._send_json(202, handler(payload, delivery_id, digest))
                 return
             match = FIX.match(path)
             if match:

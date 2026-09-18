@@ -233,7 +233,9 @@ class ReviewService:
     ):
         return self.harness.run(task_id, repository, pull_request, diff, tenant_id)
 
-    def reload_skills(self, tenant_id: str = "default") -> list:
+    def reload_skills(
+        self, tenant_id: str = "default", publish_release: bool = True,
+    ) -> list:
         if self.llm_config:
             active = self.store.get_active_skill_version("llm-review")
             self.registry.register(
@@ -248,11 +250,12 @@ class ReviewService:
             self.store, self.reviewer, self.settings.max_steps, self.settings.timeout_seconds,
             observability=self.observability,
         )
-        parent = self.releases.active(tenant_id)
-        self.releases.publish(
-            tenant_id, self._current_release_spec(tenant_id),
-            parent["release_id"] if parent else "",
-        )
+        if publish_release:
+            parent = self.releases.active(tenant_id)
+            self.releases.publish(
+                tenant_id, self._current_release_spec(tenant_id),
+                parent["release_id"] if parent else "",
+            )
         return skills
 
     def _current_release_spec(self, tenant_id: str) -> Dict[str, Any]:
@@ -971,34 +974,62 @@ class ReviewService:
         candidate = self.store.get_evolution_candidate(candidate_id)
         if not candidate or candidate["tenant_id"] != tenant_id:
             raise ValueError("evolution candidate not found")
-
-        def materialize(value: dict) -> dict:
-            evaluation = value.get("validation_result") or {}
-            score = float(
-                ((evaluation.get("validation") or {}).get("candidate") or {}).get(
-                    "score", 0.0,
-                )
+        if candidate["status"] == "PROMOTED":
+            result = self.store.promote_evolution_candidate_atomically(
+                candidate_id, tenant_id,
+                lambda _version: (_ for _ in ()).throw(
+                    AssertionError("completed promotion must not rematerialize")
+                ),
             )
-            previous = self.releases.active(tenant_id)
-            if not previous or previous["release_id"] != value["parent_release_id"]:
-                raise ValueError("evolution candidate parent Release is no longer active")
-            if value["surface"] == "GLOBAL_PROMPT":
-                version = self.store.save_skill_version(
-                    "llm-review", value["change"]["prompt"], score, activate=True,
-                )
-            else:
-                version = self.store.save_skill_artifact(
-                    value["target_id"], value["change"]["artifact"], score,
-                    True, tenant_id,
-                )
-            self.reload_skills(tenant_id)
-            release = self.releases.active(tenant_id)
-            if not release or (previous and release["release_id"] == previous["release_id"]):
-                raise RuntimeError("promotion did not create or select a new ReleaseBundle")
-            self.store.resolve_failure_cases(value["source_failure_ids"])
-            return {"surface_version": version, "release": release}
+            self.reload_skills(tenant_id, publish_release=False)
+            return result
+        parent = self.store.get_release(candidate["parent_release_id"], tenant_id)
 
-        return self.candidate_lifecycle.promote(candidate_id, materialize)
+        def release_spec(version: int) -> dict:
+            spec = copy.deepcopy(parent["spec"])
+            if candidate["surface"] == "GLOBAL_PROMPT":
+                policy = spec["prompt_policy"]
+                policy["version"] = str(version)
+                policy["overlay"] = str(candidate["change"]["prompt"]).strip()
+                policy["sha256"] = AgenticReviewer._value_sha256({
+                    "version": policy["version"],
+                    "overlay": policy["overlay"],
+                    "structured_config": policy["structured_config"],
+                })
+            elif candidate["surface"] == "SKILL":
+                skill = AgentSkill.from_artifact(
+                    candidate["change"]["artifact"], str(version),
+                )
+                entry = {
+                    "name": skill.name, "version": skill.version,
+                    "source": skill.source, "content_sha256": skill.content_sha256,
+                    "artifact": skill.to_artifact(),
+                }
+                values = {
+                    str(value.get("name")): value for value in spec.get("skills") or []
+                }
+                values[skill.name] = entry
+                spec["skills"] = [values[name] for name in sorted(values)]
+            else:
+                raise ValueError("unsupported evolution candidate surface")
+            identity = spec["runtime_identity"]
+            scanners = self.reviewer.scanners + (
+                list(self.reviewer.scanner_provider(tenant_id))
+                if self.reviewer.scanner_provider else []
+            )
+            self.reviewer._materialize_release_spec(
+                spec, identity["effective_enabled_roles"],
+                identity["requested_skills"], scanners,
+            )
+            return spec
+
+        result = self.store.promote_evolution_candidate_atomically(
+            candidate_id, tenant_id, release_spec,
+        )
+        # Runtime execution remains Release-backed. This refresh only synchronizes
+        # legacy/UI views and must not publish a second Release.
+        self.reload_skills(tenant_id, publish_release=False)
+        return result
 
     @staticmethod
     def _normalize_missed_issue(finding: Optional[dict]) -> Optional[dict]:

@@ -22,6 +22,26 @@ CANDIDATE_TRANSITIONS = {
 }
 
 
+class PromotionError(ValueError):
+    code = "PROMOTION_CONFLICT"
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class PromotionStaleParent(PromotionError):
+    code = "PROMOTION_STALE_PARENT"
+
+
+class PromotionConflict(PromotionError):
+    code = "PROMOTION_CONFLICT"
+
+
+class PromotionIntegrityConflict(PromotionError):
+    code = "PROMOTION_INTEGRITY_CONFLICT"
+
+
 def canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -197,25 +217,5 @@ class CandidateLifecycle:
                 # This is the operational validation/gating result. It is not an
                 # independent final benchmark and must not be labelled as one.
                 "validation_result": copy.deepcopy(result),
-            },
-        )
-
-    def promote(
-        self, candidate_id: str,
-        materialize: Callable[[Dict[str, Any]], Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        candidate = self.store.get_evolution_candidate(candidate_id)
-        if not candidate:
-            raise ValueError("evolution candidate not found")
-        if candidate["status"] != "READY_FOR_PROMOTION":
-            raise ValueError("only READY_FOR_PROMOTION candidates may be promoted")
-        outcome = materialize(candidate)
-        surface_version = copy.deepcopy(outcome.get("surface_version") or {})
-        release = outcome.get("release") or {}
-        if release.get("release_id"):
-            surface_version["release_id"] = release["release_id"]
-        return self.store.transition_evolution_candidate(
-            candidate_id, "PROMOTED", {
-                "surface_version": surface_version,
             },
         )

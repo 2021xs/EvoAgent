@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 from .config import Settings
 from .auth import Principal
+from .evolution_lifecycle import PromotionError
 from .github import verify_signature
 from .metrics import metrics
 from .modes import public_taxonomy, resolve_mode
@@ -611,6 +612,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send_json(200 if ok else 404, {"activated": ok})
                 return
             self._send_json(404, {"error": "not found"})
+        except PromotionError as exc:
+            self._send_json(409, {"error": exc.code, "detail": str(exc)})
         except ValueError as exc:
             self._send_json(400, {"error": str(exc)})
         except PermissionError as exc:

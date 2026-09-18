@@ -18,7 +18,12 @@ from .artifacts import (
 from .models import ReviewReport, TaskState, TraceEvent
 from .releases import ReleaseBundle, ReleaseNotFound
 from .store import utc_now
-from .evolution_lifecycle import CANDIDATE_TRANSITIONS
+from .evolution_lifecycle import (
+    CANDIDATE_TRANSITIONS,
+    PromotionConflict,
+    PromotionIntegrityConflict,
+    PromotionStaleParent,
+)
 from .workflow_events import (
     AUTOFIX_CHECKPOINT,
     CI_TERMINAL_PHASES,
@@ -716,6 +721,10 @@ class PostgresTaskStore:
     def transition_evolution_candidate(
         self, candidate_id: str, target: str, updates: Dict[str, Any],
     ) -> Dict[str, Any]:
+        if target == "PROMOTED":
+            raise PromotionConflict(
+                "PROMOTED is only reachable through atomic promotion"
+            )
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT * FROM evolution_candidates WHERE candidate_id=%s FOR UPDATE", (candidate_id,),
@@ -738,6 +747,183 @@ class PostgresTaskStore:
                 ),
             ).fetchone()
         return self._decode_evolution_candidate(updated)
+
+    def _promotion_fault(self, _stage: str) -> None:
+        """No-op fault boundary overridden by local transactional tests."""
+
+    def promote_evolution_candidate_atomically(
+        self, candidate_id: str, tenant_id: str, release_spec_factory,
+    ) -> Dict[str, Any]:
+        """Materialize one Candidate and CAS its Release in one PostgreSQL transaction."""
+        now = utc_now()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evolution_candidates WHERE candidate_id=%s "
+                "AND tenant_id=%s FOR UPDATE", (candidate_id, tenant_id),
+            ).fetchone()
+            if not row:
+                raise PromotionConflict("evolution candidate not found")
+            candidate = self._decode_evolution_candidate(row)
+            if candidate["status"] == "PROMOTED":
+                candidate["promotion_outcome"] = "PROMOTION_ALREADY_COMPLETE"
+                return candidate
+            if candidate["status"] != "READY_FOR_PROMOTION":
+                raise PromotionConflict(
+                    "only READY_FOR_PROMOTION candidates may be promoted"
+                )
+            current = conn.execute(
+                "SELECT release_id FROM active_releases WHERE tenant_id=%s FOR UPDATE",
+                (tenant_id,),
+            ).fetchone()
+            active_id = str(current["release_id"]) if current else ""
+            if active_id != str(candidate["parent_release_id"]):
+                raise PromotionStaleParent(
+                    "active Release no longer matches Candidate parent Release"
+                )
+            evaluation = candidate.get("validation_result") or {}
+            score = float(
+                ((evaluation.get("validation") or {}).get("candidate") or {}).get(
+                    "score", 0.0,
+                )
+            )
+            if candidate["surface"] == "GLOBAL_PROMPT":
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s))", ("llm-review",),
+                )
+                maximum = conn.execute(
+                    "SELECT COALESCE(MAX(version),0) AS version FROM skill_versions "
+                    "WHERE skill_name='llm-review'"
+                ).fetchone()
+                version = int(maximum["version"]) + 1
+                conn.execute(
+                    "UPDATE skill_versions SET active=FALSE WHERE skill_name='llm-review'"
+                )
+                conn.execute(
+                    "INSERT INTO skill_versions(skill_name,version,prompt,score,active,"
+                    "parent_version,created_at) VALUES ('llm-review',%s,%s,%s,TRUE,%s,%s)",
+                    (
+                        version, candidate["change"]["prompt"], score,
+                        candidate.get("parent_version"), now,
+                    ),
+                )
+                surface_version = {
+                    "skill_name": "llm-review", "version": version,
+                    "score": score, "active": True,
+                }
+            elif candidate["surface"] == "SKILL":
+                conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtext(%s))",
+                    ("artifact:" + candidate["target_id"],),
+                )
+                artifact = candidate["change"]["artifact"]
+                artifact_json = json.dumps(
+                    artifact, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                )
+                artifact_sha256 = hashlib.sha256(artifact_json.encode("utf-8")).hexdigest()
+                maximum = conn.execute(
+                    "SELECT COALESCE(MAX(version),0) AS version "
+                    "FROM skill_artifact_versions WHERE tenant_id=%s AND skill_name=%s",
+                    (tenant_id, candidate["target_id"]),
+                ).fetchone()
+                version = int(maximum["version"]) + 1
+                conn.execute(
+                    "UPDATE skill_artifact_versions SET active=FALSE "
+                    "WHERE tenant_id=%s AND skill_name=%s",
+                    (tenant_id, candidate["target_id"]),
+                )
+                conn.execute(
+                    "INSERT INTO skill_artifact_versions(tenant_id,skill_name,version,"
+                    "artifact_json,artifact_sha256,score,active,parent_version,created_at) "
+                    "VALUES (%s,%s,%s,%s::jsonb,%s,%s,TRUE,%s,%s)",
+                    (
+                        tenant_id, candidate["target_id"], version, artifact_json,
+                        artifact_sha256, score, candidate.get("parent_version"), now,
+                    ),
+                )
+                surface_version = {
+                    "tenant_id": tenant_id, "skill_name": candidate["target_id"],
+                    "version": version, "artifact_sha256": artifact_sha256,
+                    "score": score, "active": True,
+                }
+            else:
+                raise PromotionIntegrityConflict("Candidate surface is not promotable")
+            self._promotion_fault("after_version")
+            try:
+                spec = release_spec_factory(version)
+                bundle = ReleaseBundle.create(
+                    tenant_id, spec, now, candidate["parent_release_id"],
+                )
+            except Exception as exc:
+                raise PromotionIntegrityConflict(
+                    "promoted Release specification is invalid"
+                ) from exc
+            if bundle.release_id == candidate["parent_release_id"]:
+                raise PromotionIntegrityConflict(
+                    "Candidate materialization did not change the Release specification"
+                )
+            conn.execute(
+                "INSERT INTO releases(release_id,tenant_id,spec_json,spec_sha256,"
+                "parent_release_id,created_at) VALUES (%s,%s,%s::jsonb,%s,%s,%s) "
+                "ON CONFLICT(release_id) DO NOTHING",
+                (
+                    bundle.release_id, bundle.tenant_id,
+                    json.dumps(bundle.spec, ensure_ascii=False, sort_keys=True),
+                    bundle.spec_sha256, bundle.parent_release_id, bundle.created_at,
+                ),
+            )
+            persisted = conn.execute(
+                "SELECT spec_sha256,parent_release_id FROM releases WHERE release_id=%s",
+                (bundle.release_id,),
+            ).fetchone()
+            if (
+                not persisted
+                or str(persisted["spec_sha256"]) != bundle.spec_sha256
+                or str(persisted["parent_release_id"]) != candidate["parent_release_id"]
+            ):
+                raise PromotionIntegrityConflict("promoted Release identity conflict")
+            self._promotion_fault("after_release")
+            switched = conn.execute(
+                "UPDATE active_releases SET release_id=%s,previous_release_id=%s,updated_at=%s "
+                "WHERE tenant_id=%s AND release_id=%s",
+                (
+                    bundle.release_id, candidate["parent_release_id"], now,
+                    tenant_id, candidate["parent_release_id"],
+                ),
+            )
+            if switched.rowcount != 1:
+                raise PromotionStaleParent("active Release compare-and-swap failed")
+            if bundle.release_id != candidate["parent_release_id"]:
+                conn.execute(
+                    "INSERT INTO release_activations(tenant_id,release_id,"
+                    "previous_release_id,created_at) VALUES (%s,%s,%s,%s)",
+                    (tenant_id, bundle.release_id, candidate["parent_release_id"], now),
+                )
+            self._promotion_fault("after_active_release")
+            promotion = {
+                **surface_version,
+                "candidate_id": candidate_id,
+                "parent_release_id": candidate["parent_release_id"],
+                "release_id": bundle.release_id,
+                "promoted_at": now,
+                "promotion_result": "PROMOTED",
+            }
+            updated = conn.execute(
+                "UPDATE evolution_candidates SET status='PROMOTED',"
+                "surface_version_json=%s::jsonb,updated_at=%s WHERE candidate_id=%s "
+                "AND status='READY_FOR_PROMOTION' RETURNING *",
+                (json.dumps(promotion, ensure_ascii=False), now, candidate_id),
+            ).fetchone()
+            if not updated:
+                raise PromotionConflict("Candidate promotion state changed concurrently")
+            failure_ids = [int(value) for value in candidate["source_failure_ids"]]
+            if failure_ids:
+                conn.execute(
+                    "UPDATE failure_cases SET resolved=TRUE WHERE id=ANY(%s)",
+                    (failure_ids,),
+                )
+        result = self._decode_evolution_candidate(updated)
+        result["promotion_outcome"] = "PROMOTED"
+        return result
 
     def list_failure_cases(
         self, unresolved_only: bool = False, limit: int = 100,

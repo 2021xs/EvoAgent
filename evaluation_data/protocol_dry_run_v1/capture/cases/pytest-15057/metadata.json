@@ -1,0 +1,45 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "bluetech",
+  "base_sha": "56a92c19d4a71152c594726efc9deb5f0e126e99",
+  "base_snapshot_commit": "544978baccf98ffcfc83fdf521febe697b0fd805",
+  "base_snapshot_ref": "refs/snapshots/pytest-15057/base",
+  "base_tree_sha": "954144c42e7151e50436939bc45bab4a87643620",
+  "body": "This was added in 44ecf2ab2f64868de086fddf43373ba3f7805d11 as part of a feature that has since been reverted in 707b6b5e3fee6626c9ea9496b41f42077895864c.\r\n\r\nThe branch is not covered by the test suite, let's just remove this code.",
+  "captured_at": "2026-09-18T18:59:26.891512Z",
+  "case_id": "pytest-15057",
+  "changed_files": [
+    {
+      "additions": 0,
+      "deletions": 5,
+      "path": "src/_pytest/fixtures.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "likely-clean-small-change",
+  "diff_sha256": "dc9289a37d2d273b7a8c48a18a5dc6aee483c1b1b8510d9aa0164ef403070cf0",
+  "final_claim_eligible": false,
+  "head_sha": "2ba72a3a5e79e14ae477009987710f24060e69a1",
+  "head_snapshot_commit": "30236615d490b8d1ccbfdcb7e9993eb9526d5b2f",
+  "head_snapshot_ref": "refs/snapshots/pytest-15057/head",
+  "head_tree_sha": "3d1e3b375087e2729a2dcead9f615b66c9a9650c",
+  "license": {
+    "html_url": "https://github.com/pytest-dev/pytest/blob/56a92c19d4a71152c594726efc9deb5f0e126e99/LICENSE",
+    "name": "MIT License",
+    "path": "LICENSE",
+    "spdx_id": "MIT"
+  },
+  "merged_at": "2026-09-17T15:54:25Z",
+  "protocol_dry_run": true,
+  "pull_request": 15057,
+  "repository_id": "pytest-dev/pytest",
+  "sampling_rationale": "Small dead-code removal explicitly described as uncovered legacy cleanup.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "pytest-dev/pytest#15057",
+    "url": "https://github.com/pytest-dev/pytest/pull/15057"
+  },
+  "title": "fixtures: remove dead dedupe code in `--fixtures` implementation"
+}

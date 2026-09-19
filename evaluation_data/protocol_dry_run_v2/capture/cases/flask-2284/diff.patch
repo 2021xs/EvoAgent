@@ -1,0 +1,88 @@
+diff --git a/flask/helpers.py b/flask/helpers.py
+index 51c3b064a8..f37be677c2 100644
+--- a/flask/helpers.py
++++ b/flask/helpers.py
+@@ -638,18 +638,24 @@ def wiki_page(filename):
+     :raises: :class:`~werkzeug.exceptions.NotFound` if one or more passed
+             paths fall out of its boundaries.
+     """
++
++    parts = [directory]
++
+     for filename in pathnames:
+         if filename != '':
+             filename = posixpath.normpath(filename)
+-        for sep in _os_alt_seps:
+-            if sep in filename:
+-                raise NotFound()
+-        if os.path.isabs(filename) or \
+-           filename == '..' or \
+-           filename.startswith('../'):
++
++        if (
++            any(sep in filename for sep in _os_alt_seps)
++            or os.path.isabs(filename)
++            or filename == '..'
++            or filename.startswith('../')
++        ):
+             raise NotFound()
+-        directory = os.path.join(directory, filename)
+-    return directory
++
++        parts.append(filename)
++
++    return posixpath.join(*parts)
+ 
+ 
+ def send_from_directory(directory, filename, **options):
+diff --git a/tests/test_helpers.py b/tests/test_helpers.py
+index 325713c05c..d5706521bd 100644
+--- a/tests/test_helpers.py
++++ b/tests/test_helpers.py
+@@ -903,21 +903,20 @@ def generate():
+ 
+ 
+ class TestSafeJoin(object):
+-
+     def test_safe_join(self):
+         # Valid combinations of *args and expected joined paths.
+         passing = (
+-            (('a/b/c', ), 'a/b/c'),
+-            (('/', 'a/', 'b/', 'c/', ), '/a/b/c'),
+-            (('a', 'b', 'c', ), 'a/b/c'),
+-            (('/a', 'b/c', ), '/a/b/c'),
+-            (('a/b', 'X/../c'), 'a/b/c', ),
+-            (('/a/b', 'c/X/..'), '/a/b/c', ),
++            (('a/b/c',), 'a/b/c'),
++            (('/', 'a/', 'b/', 'c/'), '/a/b/c'),
++            (('a', 'b', 'c'), 'a/b/c'),
++            (('/a', 'b/c'), '/a/b/c'),
++            (('a/b', 'X/../c'), 'a/b/c'),
++            (('/a/b', 'c/X/..'), '/a/b/c'),
+             # If last path is '' add a slash
+-            (('/a/b/c', '', ), '/a/b/c/', ),
++            (('/a/b/c', ''), '/a/b/c/'),
+             # Preserve dot slash
+-            (('/a/b/c', './', ), '/a/b/c/.', ),
+-            (('a/b/c', 'X/..'), 'a/b/c/.', ),
++            (('/a/b/c', './'), '/a/b/c/.'),
++            (('a/b/c', 'X/..'), 'a/b/c/.'),
+             # Base directory is always considered safe
+             (('../', 'a/b/c'), '../a/b/c'),
+             (('/..', ), '/..'),
+@@ -931,12 +930,12 @@ def test_safe_join_exceptions(self):
+         failing = (
+             # path.isabs and ``..'' checks
+             ('/a', 'b', '/c'),
+-            ('/a', '../b/c', ),
++            ('/a', '../b/c'),
+             ('/a', '..', 'b/c'),
+             # Boundaries violations after path normalization
+-            ('/a', 'b/../b/../../c', ),
++            ('/a', 'b/../b/../../c'),
+             ('/a', 'b', 'c/../..'),
+-            ('/a', 'b/../../c', ),
++            ('/a', 'b/../../c'),
+         )
+ 
+         for args in failing:

@@ -1,0 +1,168 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 65d85751bd69..ae000c3e8c65 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1303,13 +1303,22 @@ def in_bulk(self, id_list=None, *, field_name="pk"):
+         def get_obj(obj):
+             return obj
+ 
++        selected_fields = tuple(
++            self.query.selected
++            or (
++                *self.query.extra_select,
++                *self.query.values_select,
++                *self.query.annotation_select,
++            )
++        )
++
+         if issubclass(self._iterable_class, ModelIterable):
+             # Raise an AttributeError if field_name is deferred.
+             get_key = operator.attrgetter(field_name)
+ 
+         elif issubclass(self._iterable_class, ValuesIterable):
+             if field_name not in self.query.values_select:
+-                qs = qs.values(field_name, *self.query.values_select)
++                qs = qs.values(field_name, *selected_fields)
+ 
+                 def get_obj(obj):  # noqa: F811
+                     # We can safely mutate the dictionaries returned by
+@@ -1322,16 +1331,16 @@ def get_obj(obj):  # noqa: F811
+ 
+         elif issubclass(self._iterable_class, ValuesListIterable):
+             try:
+-                field_index = self.query.values_select.index(field_name)
++                field_index = selected_fields.index(field_name)
+             except ValueError:
+-                # field_name is missing from values_select, so add it.
++                # field_name isn't selected, so add it.
+                 field_index = 0
+                 if issubclass(self._iterable_class, NamedValuesListIterable):
+                     kwargs = {"named": True}
+                 else:
+                     kwargs = {}
+                     get_obj = operator.itemgetter(slice(1, None))
+-                qs = qs.values_list(field_name, *self.query.values_select, **kwargs)
++                qs = qs.values_list(field_name, *selected_fields, **kwargs)
+ 
+             get_key = operator.itemgetter(field_index)
+ 
+@@ -1341,7 +1350,7 @@ def get_obj(obj):  # noqa: F811
+                 get_key = get_obj
+             else:
+                 # Transform it back into a non-flat values_list().
+-                qs = qs.values_list(field_name, *self.query.values_select)
++                qs = qs.values_list(field_name, *selected_fields)
+                 get_key = operator.itemgetter(0)
+                 get_obj = operator.itemgetter(1)
+ 
+diff --git a/docs/releases/6.1.1.txt b/docs/releases/6.1.1.txt
+index b9576a782014..d23e9ad06856 100644
+--- a/docs/releases/6.1.1.txt
++++ b/docs/releases/6.1.1.txt
+@@ -54,3 +54,7 @@ Bugfixes
+ * Fixed a regression in Django 6.1 that caused ``__in`` lookups on annotations
+   to erroneously return empty querysets and ``__range`` lookups to crash when
+   passed an iterator (:ticket:`37311`).
++
++* Fixed a bug in Django 6.1 where :meth:`.QuerySet.in_bulk` chained after
++  :meth:`.QuerySet.values` or :meth:`.QuerySet.values_list` could drop selected
++  annotations or produce incorrect mapping keys (:ticket:`37312`).
+diff --git a/tests/lookup/tests.py b/tests/lookup/tests.py
+index 586dec37908d..acdfbfabfc6f 100644
+--- a/tests/lookup/tests.py
++++ b/tests/lookup/tests.py
+@@ -368,6 +368,94 @@ def test_in_bulk_values_fields(self):
+             {self.a1.pk: {"headline": "Article 1"}},
+         )
+ 
++    def test_in_bulk_values_annotation(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values("headline", "author_name")
++            .in_bulk([self.a1.pk])
++        )
++        self.assertEqual(
++            arts,
++            {
++                self.a1.pk: {
++                    "headline": "Article 1",
++                    "author_name": "Author 1",
++                }
++            },
++        )
++
++    def test_in_bulk_values_annotation_all_fields(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values()
++            .in_bulk([self.a1.pk])
++        )
++        self.assertEqual(
++            arts,
++            {
++                self.a1.pk: {
++                    "id": self.a1.pk,
++                    "author_id": self.au1.pk,
++                    "headline": "Article 1",
++                    "pub_date": self.a1.pub_date,
++                    "slug": "a1",
++                    "author_name": "Author 1",
++                }
++            },
++        )
++
++    def test_in_bulk_values_extra_select_all_fields(self):
++        arts = (
++            Article.objects.extra(select={"marker": "1"}).values().in_bulk([self.a1.pk])
++        )
++        self.assertEqual(
++            arts,
++            {
++                self.a1.pk: {
++                    "marker": 1,
++                    "id": self.a1.pk,
++                    "author_id": self.au1.pk,
++                    "headline": "Article 1",
++                    "pub_date": self.a1.pub_date,
++                    "slug": "a1",
++                }
++            },
++        )
++
++    def test_in_bulk_values_list_annotation(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values_list("author_name", "headline")
++            .in_bulk([self.a1.pk])
++        )
++        self.assertEqual(arts, {self.a1.pk: ("Author 1", "Article 1")})
++
++    def test_in_bulk_values_list_annotation_before_pk(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values_list("author_name", "pk")
++            .in_bulk([self.a1.pk])
++        )
++        self.assertEqual(arts, {self.a1.pk: ("Author 1", self.a1.pk)})
++
++    def test_in_bulk_values_list_named_annotation(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values_list("headline", "author_name", named=True)
++            .in_bulk([self.a1.pk])
++        )
++        article = arts[self.a1.pk]
++        self.assertEqual(article._fields, ("pk", "headline", "author_name"))
++        self.assertEqual(article, (self.a1.pk, "Article 1", "Author 1"))
++
++    def test_in_bulk_values_list_flat_annotation(self):
++        arts = (
++            Article.objects.annotate(author_name=F("author__name"))
++            .values_list("author_name", flat=True)
++            .in_bulk([self.a1.pk])
++        )
++        self.assertEqual(arts, {self.a1.pk: "Author 1"})
++
+     def test_in_bulk_values_fields_including_pk(self):
+         arts = Article.objects.values("pk", "headline").in_bulk([self.a1.pk])
+         self.assertEqual(

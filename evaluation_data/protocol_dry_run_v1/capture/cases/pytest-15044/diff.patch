@@ -1,0 +1,88 @@
+diff --git a/AUTHORS b/AUTHORS
+index ad4c2093892..e2fad5e8364 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -396,6 +396,7 @@ Pierre Sassoulas
+ Pieter Mulder
+ Piotr Banaszkiewicz
+ Piotr Helm
++Poorva Barve
+ Poulami Sau
+ Prakhar Gurunani
+ Praneeth Kodumagulla
+diff --git a/changelog/15043.bugfix.rst b/changelog/15043.bugfix.rst
+new file mode 100644
+index 00000000000..34c39e62a4a
+--- /dev/null
++++ b/changelog/15043.bugfix.rst
+@@ -0,0 +1 @@
++Cache writes now emit :class:`pytest.PytestCacheWarning` when writing or closing the cache file fails, consistent with errors opening the file.
+diff --git a/src/_pytest/cacheprovider.py b/src/_pytest/cacheprovider.py
+index 5fbc6771b29..5d4a528077d 100644
+--- a/src/_pytest/cacheprovider.py
++++ b/src/_pytest/cacheprovider.py
+@@ -240,15 +240,12 @@ def set(self, key: str, value: object) -> None:
+             return
+         data = json.dumps(value, ensure_ascii=False, indent=2)
+         try:
+-            f = path.open("w", encoding="UTF-8")
++            path.write_text(data, encoding="UTF-8")
+         except OSError as exc:
+             self.warn(
+                 f"cache could not write path {path}: {exc}",
+                 _ispytest=True,
+             )
+-        else:
+-            with f:
+-                f.write(data)
+ 
+     def _ensure_cache_dir_and_supporting_files(self) -> None:
+         """Create the cache dir and its supporting files."""
+diff --git a/testing/test_cacheprovider.py b/testing/test_cacheprovider.py
+index 014b26c60c5..a38a72c6011 100644
+--- a/testing/test_cacheprovider.py
++++ b/testing/test_cacheprovider.py
+@@ -4,10 +4,12 @@
+ from collections.abc import Sequence
+ from enum import auto
+ from enum import Enum
++import errno
+ import os
+ from pathlib import Path
+ import shutil
+ from typing import Any
++from unittest.mock import mock_open
+ 
+ from _pytest.compat import assert_never
+ from _pytest.config import ExitCode
+@@ -104,6 +106,30 @@ def test_cache_writefail_cachefile_silent(self, pytester: Pytester) -> None:
+         assert cache is not None
+         cache.set("test/broken", [])
+ 
++    @pytest.mark.parametrize("failure", ["open", "write", "close"])
++    def test_cache_writefail_warns(
++        self, pytester: Pytester, monkeypatch: MonkeyPatch, failure: str
++    ) -> None:
++        config = pytester.parseconfigure()
++        cache = config.cache
++        assert cache is not None
++        cache.set("test/broken", [])
++        mocked_open = mock_open()
++        failing_operation = {
++            "open": mocked_open,
++            "write": mocked_open.return_value.write,
++            "close": mocked_open.return_value.__exit__,
++        }[failure]
++        failing_operation.side_effect = OSError(errno.ENOSPC, "No space left on device")
++
++        with monkeypatch.context() as m:
++            m.setattr(Path, "open", mocked_open)
++            with pytest.warns(
++                pytest.PytestCacheWarning,
++                match="cache could not write path .*: .*No space left on device",
++            ):
++                cache.set("test/broken", [])
++
+     @pytest.fixture
+     def unwritable_cache_dir(self, pytester: Pytester) -> Generator[Path]:
+         cache_dir = pytester.path.joinpath(".pytest_cache")

@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "flask-6096",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "flask-6133",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": false,
+        "full_agreement": false,
+        "location": false,
+        "logical_issue_identity": false,
+        "severity": false,
+        "should_comment": false,
+        "taxonomy": false,
+        "technical_agreement": false,
+        "technical_existence": false
+      },
+      "case_id": "requests-6963",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": [
+        "requests-6963-b-001"
+      ]
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "requests-7025",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": false,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": false,
+        "technical_agreement": false,
+        "technical_existence": true
+      },
+      "case_id": "httpx-3690",
+      "pairings": [
+        {
+          "agreement": {
+            "location": true,
+            "logical_issue_identity": true,
+            "severity": true,
+            "should_comment": true,
+            "taxonomy": false,
+            "technical_existence": true
+          },
+          "annotator_a_finding_id": "httpx-3690-a-f1",
+          "annotator_b_finding_id": "httpx-3690-b-001",
+          "pairing_status": "EASY_DETERMINISTIC_PAIR"
+        }
+      ],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "chi-1167",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "pytest-15044",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    },
+    {
+      "agreement": {
+        "comment_usefulness_agreement": true,
+        "full_agreement": true,
+        "location": true,
+        "logical_issue_identity": true,
+        "severity": true,
+        "should_comment": true,
+        "taxonomy": true,
+        "technical_agreement": true,
+        "technical_existence": true
+      },
+      "case_id": "pytest-15057",
+      "pairings": [],
+      "unpaired_a": [],
+      "unpaired_b": []
+    }
+  ],
+  "final_claim_eligible": false,
+  "protocol_dry_run": true
+}

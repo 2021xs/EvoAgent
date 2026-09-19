@@ -1,0 +1,84 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "adamchainz",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+  "base_snapshot_commit": "0eee053ba3d3eba547e391aa36bd96c30a06c824",
+  "base_snapshot_ref": "refs/snapshots/django-21754/base",
+  "base_tree_sha": "0ffa0d786a1d2d62bb67a4697537b4942eaf53a0",
+  "body": "#### Trac ticket number\r\n\r\nticket-37263\r\n\r\n#### Branch description\r\n\r\nSearch terms for non-text `__exact` `search_fields` entries were validated with the model field's `formfield().to_python()`, which failed to reject invalid terms for two kinds of fields:\r\n\r\n- Fields with choices use `TypedChoiceField`, whose `to_python()` returns the raw string unvalidated, so any non-matching search term (e.g. `\"john\"` against an `IntegerField` with `choices`) reached the ORM and crashed the changelist with a `ValueError` (HTTP 500).\r\n\r\n- `BooleanField` uses `forms.BooleanField`, whose `to_python()` maps almost any string to `True`, so an arbitrary search term OR-matched every row with a `True` value instead of matching nothing.\r\n\r\nBoolean search terms are now parsed strictly with\r\n`forms.NullBooleanField` (so `\"true\"`/`\"false\"`/`\"1\"`/`\"0\"` still match, while other terms are skipped), string values that a form field returns unconverted are checked against the model field's `to_python()`, and `ChangeList.get_queryset()` converts remaining value errors raised while building search results into `IncorrectLookupParameters` instead of letting them bubble up as a server error.\r\n\r\nRegression in 4cecf3039586ea738afafb9a28c946bff42c37c1.\r\n\r\n#### AI Assistance Disclosure (REQUIRED)\r\n<!-- Select exactly ONE of the following: -->\r\n- [ ] **No AI tools were used** in preparing this PR.\r\n- [x] **If AI tools were used**, I have disclosed which ones, and fully reviewed and verified their output.\r\n<!-- If AI tools were used, provide which tools were used here. -->\r\n\r\nClaude 5 Fable did nearly all the work here, discovering the bug and writing the commit. I made minor edits. I agree with the report and approach.\r\n\r\n#### Checklist\r\n- [x] This PR follows the [contribution guidelines](https://docs.djangoproject.com/en/stable/internals/contributing/writing-code/submitting-patches/).\r\n- [x] This PR **does not** disclose a security vulnerability (see [vulnerability reporting](https://docs.djangoproject.com/en/stable/internals/security/)).\r\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [x] The commit message is written in past tense, mentions the ticket number (if applicable), and ends with a period (see [guidelines](https://docs.djangoproject.com/en/dev/internals/contributing/committing-code/#committing-guidelines)).\r\n- [x] I have not requested, and will not request, an automated AI review for this PR. <!-- You are welcome to do so in your own fork. -->\r\n\r\n<!-- Leave the following items unchecked if not applicable. -->\r\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [x] I have added or updated relevant tests.\r\n- [x] I have added or updated relevant docs, including release notes if applicable.\r\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.\r\n",
+  "captured_at": "2026-09-19T02:16:08.217824Z",
+  "case_id": "django-21754",
+  "changed_files": [
+    {
+      "additions": 42,
+      "deletions": 0,
+      "path": "django/contrib/admin/formfields.py",
+      "previous_filename": null,
+      "status": "added"
+    },
+    {
+      "additions": 23,
+      "deletions": 6,
+      "path": "django/contrib/admin/options.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 6,
+      "deletions": 0,
+      "path": "docs/releases/6.1.1.txt",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 18,
+      "deletions": 1,
+      "path": "tests/admin_changelist/admin.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 5,
+      "deletions": 1,
+      "path": "tests/admin_changelist/models.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 118,
+      "deletions": 6,
+      "path": "tests/admin_changelist/tests.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "multi-finding",
+  "diff_sha256": "8bf0324a2f528aeb34d58d6e4b8882e51c799d2632ca31abb735555928ea75d2",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+  "head_snapshot_commit": "7ce849bee674830c7e9656b37a0ad3e246440d6e",
+  "head_snapshot_ref": "refs/snapshots/django-21754/head",
+  "head_tree_sha": "0373e411a6306cb4aabe1bbc6de15143cbd5479a",
+  "license": {
+    "html_url": "https://github.com/django/django/blob/73cc09f14f13fedddc14d6ba5b287cb33c24e4a4/LICENSE",
+    "name": "Other",
+    "path": "LICENSE",
+    "spdx_id": "NOASSERTION"
+  },
+  "merged_at": "2026-08-31T15:58:00Z",
+  "protocol_dry_run": true,
+  "pull_request": 21754,
+  "repository_base_tip_sha_at_capture": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+  "repository_id": "django/django",
+  "requested_sampling_category": "multi-finding",
+  "sampling_rationale": "Six-file admin search correctness change chosen to stress multiple independently discoverable review concerns.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "django/django#21754",
+    "url": "https://github.com/django/django/pull/21754"
+  },
+  "title": "Fixed #37263 -- Fixed changelist __exact search crashes and over-matching."
+}

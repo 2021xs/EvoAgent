@@ -1,0 +1,36 @@
+{
+  "annotator_id": "pytest-15044-b",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-18T18:31:31.662706Z",
+  "context_policy_hash": "a0dddcc6d14f7f09b33983f2c1d8fe921bc514be16c9b92a0256f47f468c8a0b",
+  "context_policy_id": "frozen-repository-read-only-v1",
+  "execution": {
+    "exit_code": 0,
+    "input_tokens": 110689,
+    "output_tokens": 1625,
+    "repository_files_inspected": [
+      "src/_pytest/cacheprovider.py",
+      "testing/test_cacheprovider.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-18T18:30:41.624234Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:30:41.626107Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:30:41.627876Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:30:41.629669Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:30:41.632040Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:30:41.633523Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n",
+    "tool_calls": 4,
+    "wall_clock_seconds": 50.117
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1773244bd369e07ede1c38285b1beb371e54f2601f138cca1fa3f0d99b978a2c",
+  "prompt_version": "evidence-adjudication-guide-v1",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "c6bbdf39-f122-4fd1-ad67-73700c81398e",
+  "started_at": "2026-09-18T18:30:41.573909Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

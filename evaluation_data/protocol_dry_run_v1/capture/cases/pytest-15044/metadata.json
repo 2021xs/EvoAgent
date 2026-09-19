@@ -1,0 +1,66 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "barveP",
+  "base_sha": "99ab2acccff15f757260a1e1fbb0d2a47fc01041",
+  "base_snapshot_commit": "37a97d0bc1787f1b451375c1a3669b85042e9027",
+  "base_snapshot_ref": "refs/snapshots/pytest-15044/base",
+  "base_tree_sha": "b582446d2cef9441abf954e7d04fb6fdcde9edc6",
+  "body": "Fixes #15043.\n\n`cache.set()` already warns when opening a cache file fails, but an `OSError` from writing or closing it currently escapes. Move the existing write into the same error handler so these failures also produce `PytestCacheWarning`.\n\nThe regression test covers open, write, and close failures. The write and close cases fail before the fix; all three pass afterward. A separate reproduction using a real file-size limit also fails on pytest 9.1.1 and unmodified main, then produces warnings with this fix.\n\nChecks on macOS:\n\n- Full Python 3.13 suite, `tox -e py313 -- -q`: 4,607 passed, 51 skipped, 15 xfailed, 5 xpassed.\n- Cache tests on Python 3.12 and 3.13: 68 passed on each.\n- `tox -e linting`: passed.\n\nJSON serialization and warning filters keep their existing behavior.\n\nCo-developed by Poorva Barve and Codex.\n",
+  "captured_at": "2026-09-18T18:59:18.394035Z",
+  "case_id": "pytest-15044",
+  "changed_files": [
+    {
+      "additions": 1,
+      "deletions": 0,
+      "path": "AUTHORS",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 1,
+      "deletions": 0,
+      "path": "changelog/15043.bugfix.rst",
+      "previous_filename": null,
+      "status": "added"
+    },
+    {
+      "additions": 1,
+      "deletions": 4,
+      "path": "src/_pytest/cacheprovider.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 26,
+      "deletions": 0,
+      "path": "testing/test_cacheprovider.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "correctness-error-handling",
+  "diff_sha256": "4aedd6b4ece27ae5b32b32daa5d7b263d3e162817bdbc5a4f2cb12ff8860083b",
+  "final_claim_eligible": false,
+  "head_sha": "f36ef6fe1d735aca4c033303c067db037d4aaf22",
+  "head_snapshot_commit": "25b50abc9f0b009a6627caca1a7fe3a687252e8b",
+  "head_snapshot_ref": "refs/snapshots/pytest-15044/head",
+  "head_tree_sha": "e60ecbad01d30c93a6ef0d74a03a7b2fff9d6bcd",
+  "license": {
+    "html_url": "https://github.com/pytest-dev/pytest/blob/99ab2acccff15f757260a1e1fbb0d2a47fc01041/LICENSE",
+    "name": "MIT License",
+    "path": "LICENSE",
+    "spdx_id": "MIT"
+  },
+  "merged_at": "2026-09-18T06:25:34Z",
+  "protocol_dry_run": true,
+  "pull_request": 15044,
+  "repository_id": "pytest-dev/pytest",
+  "sampling_rationale": "Cache write/close failure handling with regression coverage.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "pytest-dev/pytest#15044",
+    "url": "https://github.com/pytest-dev/pytest/pull/15044"
+  },
+  "title": "Warn when writing or closing a cache file fails"
+}

@@ -1,0 +1,63 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "thejcannon",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "ca097c96f97d8d2a5da09b8ca736c7e78a2467f6",
+  "base_snapshot_commit": "3fb04b517a57892e086ec5a4bd209d6495456e91",
+  "base_snapshot_ref": "refs/snapshots/httpx-3699/base",
+  "base_tree_sha": "b2cd92bfaba3d927eb6db03a5064340ea7a6f827",
+  "body": "# Summary\r\n\r\nJust adding `FunctionAuth` to `httpx._auth`'s `__all__` so it can be imported as `httpx.FunctionAuth`.\r\n\r\n(Note this just seems to be an omission in https://github.com/encode/httpx/pull/3106)\r\n\r\n# Checklist\r\n\r\n- [x] I understand that this PR may be closed in case there was no previous discussion. (This doesn't apply to typos!)\r\n- [ ] ~I've added a test for each change that was introduced, and I tried as much as possible to make a single atomic change.~\r\n  - `tests/test_exported_members.py:test_exported_members` covers this\r\n- [ ] ~I've updated the documentation accordingly.~\r\n  - Also didn't seem worth documenting 🤷‍♂️ \r\n",
+  "captured_at": "2026-09-19T02:16:59.625801Z",
+  "case_id": "httpx-3699",
+  "changed_files": [
+    {
+      "additions": 4,
+      "deletions": 0,
+      "path": "CHANGELOG.md",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 1,
+      "deletions": 0,
+      "path": "httpx/__init__.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 1,
+      "deletions": 1,
+      "path": "httpx/_auth.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "likely-clean",
+  "diff_sha256": "acf37a9389ad53fb8ce90681ad2a26c96a5959dfb73a6692f78949959d6c6be3",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "4b9f63e507c4ea75fa59f6bbdfb103e2f014a6f9",
+  "head_snapshot_commit": "f7f606d90579ddf94ce104fee36180feef770686",
+  "head_snapshot_ref": "refs/snapshots/httpx-3699/head",
+  "head_tree_sha": "a0348e2a1b9fc43336690740213ea68fd833e703",
+  "license": {
+    "html_url": "https://github.com/encode/httpx/blob/ca097c96f97d8d2a5da09b8ca736c7e78a2467f6/LICENSE.md",
+    "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+    "path": "LICENSE.md",
+    "spdx_id": "BSD-3-Clause"
+  },
+  "merged_at": "2025-12-10T14:58:48Z",
+  "protocol_dry_run": true,
+  "pull_request": 3699,
+  "repository_base_tip_sha_at_capture": "ca097c96f97d8d2a5da09b8ca736c7e78a2467f6",
+  "repository_id": "encode/httpx",
+  "requested_sampling_category": "likely-clean",
+  "sampling_rationale": "Small public API export correction with changelog and explicit export declaration.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "encode/httpx#3699",
+    "url": "https://github.com/encode/httpx/pull/3699"
+  },
+  "title": "Expose `FunctionAuth` in `__all__`"
+}

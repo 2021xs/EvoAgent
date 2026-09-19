@@ -1,0 +1,68 @@
+{
+  "annotator_id": "django-21754-b",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:19:14.529794Z",
+  "context_policy_hash": "aca9cee42327b78e0f6af50966c248df8765003164e125455ee41464946ba621",
+  "context_policy_id": "frozen-repository-read-only-v2",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "django/contrib/admin/formfields.py": 2,
+        "django/contrib/admin/options.py": 2,
+        "django/db/models/fields/__init__.py": 2,
+        "django/forms/fields.py": 3,
+        "tests/admin_changelist/tests.py": 1
+      },
+      "files_inspected": [
+        "django/contrib/admin/formfields.py",
+        "django/contrib/admin/options.py",
+        "django/db/models/fields/__init__.py",
+        "django/forms/fields.py",
+        "tests/admin_changelist/tests.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 100445,
+      "repeat_file_reads": 5,
+      "repository_read_search_tool_calls": 4,
+      "tool_result_chars": 42098,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 5
+    },
+    "exit_code": 0,
+    "input_tokens": 100445,
+    "output_tokens": 1051,
+    "repository_files_inspected": [
+      "django/contrib/admin/formfields.py",
+      "django/contrib/admin/options.py",
+      "django/db/models/fields/__init__.py",
+      "django/forms/fields.py",
+      "tests/admin_changelist/tests.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:18:37.801591Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:18:37.802216Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:19:09.049407Z  WARN codex_core::shell_snapshot: Failed to delete shell snapshot at AbsolutePathBuf(\"/Users/bytedance/.codex/shell_snapshots/01a0b775-5f4b-7c53-9d38-e7c90acc26a6.1789784317772190000.sh\"): Os { code: 2, kind: NotFound, message: \"No such file or directory\" }\n",
+    "tool_calls": 4,
+    "wall_clock_seconds": 36.822
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "4f698ed93aa7a15fa1d1b3d123fe4f863a721d9dc1975edbec3fe45704c95bd0",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "7ad516a7-8db0-413a-b62c-bf414ee7d703",
+  "started_at": "2026-09-19T02:18:37.738728Z",
+  "tool_policy_hash": "b03b2fcc21f87888da456f292e4ce1f6b9e583b964f0dcca32546e4e984679b5",
+  "tool_policy_id": "codex-bounded-read-only-v2"
+}

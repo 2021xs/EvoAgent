@@ -1,0 +1,52 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "awoimbee",
+  "base_sha": "7bc45877a86192af77645e156eb3744f95b47dae",
+  "base_snapshot_commit": "c50018a9c1ef302e19cda44895626697989501dd",
+  "base_snapshot_ref": "refs/snapshots/requests-6963/base",
+  "base_tree_sha": "a75eb40146d0cffe0581f2f18451cf8348f35a3e",
+  "body": "https://seclists.org/fulldisclosure/2025/Jun/2\r\n\r\nHonestly I have no idea why this lib used `netloc` + manual parsing instead of `hostname` as I can see references to `hostname` as early as from [the python 2.6 docs](https://docs.python.org/2.6/library/urlparse.html).",
+  "captured_at": "2026-09-18T18:58:39.214629Z",
+  "case_id": "requests-6963",
+  "changed_files": [
+    {
+      "additions": 1,
+      "deletions": 8,
+      "path": "src/requests/utils.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 19,
+      "deletions": 0,
+      "path": "tests/test_utils.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "security-sensitive-metadata-signal",
+  "diff_sha256": "ddeb9c422d9d75497a02b7f157f40158204b34c89db58f687b68c92ace94a343",
+  "final_claim_eligible": false,
+  "head_sha": "92bab7d1142db0c807060577233568e5f7734c9b",
+  "head_snapshot_commit": "83bd72303af4d6d249e77b6f90eb3c193e100f2b",
+  "head_snapshot_ref": "refs/snapshots/requests-6963/head",
+  "head_tree_sha": "597201c513423b9b7e745919e18a58f2ceb3c788",
+  "license": {
+    "html_url": "https://github.com/psf/requests/blob/7bc45877a86192af77645e156eb3744f95b47dae/LICENSE",
+    "name": "Apache License 2.0",
+    "path": "LICENSE",
+    "spdx_id": "Apache-2.0"
+  },
+  "merged_at": "2025-06-05T14:55:33Z",
+  "protocol_dry_run": true,
+  "pull_request": 6963,
+  "repository_id": "psf/requests",
+  "sampling_rationale": "Selected from the public PR title/body as security-sensitive; the later frozen-diff audit found that the captured base already contains the hostname parsing fix, so this case tests metadata-versus-source verification rather than a credential-fix diff.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "psf/requests#6963",
+    "url": "https://github.com/psf/requests/pull/6963"
+  },
+  "title": "fix CVE 2024 47081: manual url parsing leads to netloc credentials leak"
+}

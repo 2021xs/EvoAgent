@@ -1,0 +1,66 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "lkk7",
+  "base_sha": "514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b",
+  "base_snapshot_commit": "f9cedde6654a9f0e869fd92f952986fd91eee552",
+  "base_snapshot_ref": "refs/snapshots/flask-6096/base",
+  "base_tree_sha": "c7ec5b743fd39ea74136f6504ddd65787c8a5eec",
+  "body": "Fix two usages of `.partition(\":\")` on potential IPv6 addresses.\r\nReplace them with alternatives.\r\n\r\nFixes https://github.com/pallets/flask/issues/6093\r\n\r\n<!--\r\nEnsure each step in CONTRIBUTING.rst is complete, especially the following:\r\n- Add tests that demonstrate the correct behavior of the change. Tests\r\n  should fail without the change.\r\n- Add or update relevant docs, in the docs folder and in code.\r\n- Add an entry in CHANGES.rst summarizing the change and linking to the issue.\r\n- Add `.. versionchanged::` entries in any relevant code docs.\r\n-->\r\n",
+  "captured_at": "2026-09-18T18:58:09.622082Z",
+  "case_id": "flask-6096",
+  "changed_files": [
+    {
+      "additions": 7,
+      "deletions": 4,
+      "path": "src/flask/app.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 1,
+      "deletions": 1,
+      "path": "src/flask/testing.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 1,
+      "deletions": 0,
+      "path": "tests/test_basic.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 14,
+      "deletions": 0,
+      "path": "tests/test_testing.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "correctness-bug-fix",
+  "diff_sha256": "953270ffbfc4b312e23bebf58e1865e358734c917bd6f325d730ac1dd847c5ff",
+  "final_claim_eligible": false,
+  "head_sha": "7203feabf723edae0286ae5dc64fec8ac4c91735",
+  "head_snapshot_commit": "b106050e07769617b9ef225080f692f62d4fa77a",
+  "head_snapshot_ref": "refs/snapshots/flask-6096/head",
+  "head_tree_sha": "4eb11319bd4fe0d074eb1444513ff262a0679cac",
+  "license": {
+    "html_url": "https://github.com/pallets/flask/blob/514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b/LICENSE.txt",
+    "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+    "path": "LICENSE.txt",
+    "spdx_id": "BSD-3-Clause"
+  },
+  "merged_at": "2026-08-11T19:48:41Z",
+  "protocol_dry_run": true,
+  "pull_request": 6096,
+  "repository_id": "pallets/flask",
+  "sampling_rationale": "Small IPv6 parsing correction with regression tests.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "pallets/flask#6096",
+    "url": "https://github.com/pallets/flask/pull/6096"
+  },
+  "title": "Fix `.partition(\":\")` usage on potential IPv6 addresses"
+}

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "evoagent-evidence-adjudicated-pr-protocol-dry-run-v2",
+  "dataset_version": "0.2.0-protocol-dry-run",
+  "protocol_dry_run": true,
+  "final_claim_eligible": false,
+  "dry_run_iteration": 2,
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "sampling_policy": "purposeful protocol stress coverage selected from public PR metadata without EvoAgent predictions; categories require post-capture source verification",
+  "cases": [
+    {"case_id": "django-21754", "repository": "django/django", "pull_request": 21754, "requested_sampling_category": "multi-finding", "sampling_rationale": "Six-file admin search correctness change chosen to stress multiple independently discoverable review concerns."},
+    {"case_id": "urllib3-3786", "repository": "urllib3/urllib3", "pull_request": 3786, "requested_sampling_category": "multi-finding", "sampling_rationale": "Cross-layer proxy TLS change with implementation and integration tests chosen to stress multiple findings."},
+    {"case_id": "flask-2284", "repository": "pallets/flask", "pull_request": 2284, "requested_sampling_category": "taxonomy-alias-heavy", "sampling_rationale": "Safe path joining on Windows provides path-traversal/directory-traversal taxonomy alias pressure."},
+    {"case_id": "django-21867", "repository": "django/django", "pull_request": 21867, "requested_sampling_category": "cross-file-root-cause-symptom", "sampling_rationale": "ORM implementation and regression tests exercise root-cause versus observed-query symptom descriptions."},
+    {"case_id": "urllib3-4960", "repository": "urllib3/urllib3", "pull_request": 4960, "requested_sampling_category": "strong-objective-evidence", "sampling_rationale": "Focused response-read correction includes a concrete reproducer-style regression test."},
+    {"case_id": "httpx-3699", "repository": "encode/httpx", "pull_request": 3699, "requested_sampling_category": "likely-clean", "sampling_rationale": "Small public API export correction with changelog and explicit export declaration."}
+  ]
+}

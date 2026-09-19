@@ -1,0 +1,326 @@
+diff --git a/django/contrib/admin/formfields.py b/django/contrib/admin/formfields.py
+new file mode 100644
+index 000000000000..a60c344ebd84
+--- /dev/null
++++ b/django/contrib/admin/formfields.py
+@@ -0,0 +1,42 @@
++from django.core.exceptions import ValidationError
++from django.forms import NullBooleanField
++
++
++class StrictBooleanField(NullBooleanField):
++    """
++    forms.BooleanField coerces almost any truthy input to True. Delegate to
++    NullBooleanField's stricter parsing while still rejecting None values.
++    """
++
++    def to_python(self, value):
++        # The admin changelist search allows case-insensitivity.
++        try:
++            value = value.lower()
++        except AttributeError:
++            pass
++        value = super().to_python(value)
++        if value is None:
++            # Not translated, as this is currently not user-facing.
++            raise ValidationError("Invalid value.")
++        return value
++
++
++class StrictNullBooleanField(NullBooleanField):
++    """
++    forms.NullBooleanField doesn't distinguish explicit None values, so check
++    for that before delegating.
++    """
++
++    def to_python(self, value):
++        # The admin changelist search allows case-insensitivity.
++        try:
++            value = value.lower()
++        except AttributeError:
++            pass
++        if value in (None, "none"):
++            return None
++        value = super().to_python(value)
++        if value is None:
++            # Not translated, as this is currently not user-facing.
++            raise ValidationError("Invalid value.")
++        return value
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index bb8ae23d170b..d79361927960 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -16,7 +16,7 @@
+ from django.apps import apps
+ from django.conf import settings
+ from django.contrib import messages
+-from django.contrib.admin import helpers, widgets
++from django.contrib.admin import formfields, helpers, widgets
+ from django.contrib.admin.checks import (
+     BaseModelAdminChecks,
+     InlineModelAdminChecks,
+@@ -1356,19 +1356,36 @@ def construct_search(field_name):
+             for bit in smart_split(search_term):
+                 if bit.startswith(('"', "'")) and bit[0] == bit[-1]:
+                     bit = unescape_string_literal(bit)
+-                # Build term lookups, skipping values invalid for their field.
++                # Build term lookups, skipping values that cannot be converted
++                # to the expected type.
+                 bit_lookups = []
+                 for orm_lookup, validate_field in orm_lookups:
+                     if validate_field is not None:
+                         formfield = validate_field.formfield()
+                         try:
+-                            if formfield is not None:
+-                                value = formfield.to_python(bit)
+-                            else:
++                            if formfield is None:
+                                 # Fields like AutoField lack a form field.
+                                 value = validate_field.to_python(bit)
++                            elif isinstance(formfield, forms.NullBooleanField):
++                                # Allow explicit "None" strings.
++                                formfield = formfields.StrictNullBooleanField()
++                                value = formfield.to_python(bit)
++                            elif isinstance(formfield, forms.BooleanField):
++                                # Avoid the coercion of most strings to True.
++                                value = formfields.StrictBooleanField().to_python(bit)
++                            elif isinstance(
++                                formfield,
++                                (
++                                    forms.TypedChoiceField,
++                                    forms.TypedMultipleChoiceField,
++                                ),
++                            ):
++                                # Workaround for issue #34156.
++                                value = formfield.clean(bit)
++                            else:
++                                value = formfield.to_python(bit)
+                         except ValidationError:
+-                            # Skip this lookup for invalid values.
++                            # Skip this lookup for invalid types.
+                             continue
+                     else:
+                         value = bit
+diff --git a/docs/releases/6.1.1.txt b/docs/releases/6.1.1.txt
+index 1b7a25bb2ad9..cfffb5fe5056 100644
+--- a/docs/releases/6.1.1.txt
++++ b/docs/releases/6.1.1.txt
+@@ -39,3 +39,9 @@ Bugfixes
+   ``QuerySet`` of a model overriding ``Model.from_db()`` without the new
+   ``fetch_mode`` keyword argument. Such overrides now work again, but are
+   deprecated and should be updated to accept ``fetch_mode`` (:ticket:`37259`).
++
++* Fixed a regression in Django 6.1 where an admin changelist search crashed
++  when a ``search_fields`` entry used an ``__exact`` lookup on a field with
++  ``choices``, and where any search term matched all rows with a ``True``
++  value when an ``__exact`` lookup was used on a ``BooleanField``
++  (:ticket:`37263`).
+diff --git a/tests/admin_changelist/admin.py b/tests/admin_changelist/admin.py
+index 910cd90d9eb6..27d5b99b62a2 100644
+--- a/tests/admin_changelist/admin.py
++++ b/tests/admin_changelist/admin.py
+@@ -3,7 +3,17 @@
+ from django.contrib.auth.models import User
+ from django.core.paginator import Paginator
+ 
+-from .models import Band, Child, Event, Genre, GrandChild, Parent, ProxyUser, Swallow
++from .models import (
++    Band,
++    Child,
++    Event,
++    Genre,
++    GrandChild,
++    MixedFieldsModel,
++    Parent,
++    ProxyUser,
++    Swallow,
++)
+ 
+ site = admin.AdminSite(name="admin")
+ 
+@@ -62,6 +72,13 @@ class GrandChildAdmin(admin.ModelAdmin):
+ site.register(GrandChild, GrandChildAdmin)
+ 
+ 
++class MixedFieldsAdmin(admin.ModelAdmin):
++    search_fields = ["name", "choice_field__exact"]
++
++
++site.register(MixedFieldsModel, MixedFieldsAdmin)
++
++
+ class CustomPaginationAdmin(ChildAdmin):
+     paginator = CustomPaginator
+ 
+diff --git a/tests/admin_changelist/models.py b/tests/admin_changelist/models.py
+index f805c738b7a6..e63fc14a2970 100644
+--- a/tests/admin_changelist/models.py
++++ b/tests/admin_changelist/models.py
+@@ -73,7 +73,7 @@ class Membership(models.Model):
+ 
+ 
+ class Quartet(Group):
+-    pass
++    plays_weddings = models.BooleanField(null=True)
+ 
+ 
+ class ChordsMusician(Musician):
+@@ -148,5 +148,9 @@ class Meta:
+ class MixedFieldsModel(models.Model):
+     """Model with multiple field types for testing search validation."""
+ 
++    name = models.CharField(max_length=30, blank=True)
+     int_field = models.IntegerField(null=True, blank=True)
++    choice_field = models.IntegerField(
++        choices=[(1, "Active"), (2, "Archived")], null=True, blank=True
++    )
+     json_field = models.JSONField(null=True, blank=True)
+diff --git a/tests/admin_changelist/tests.py b/tests/admin_changelist/tests.py
+index c81d69868ec2..4a468ddbcf70 100644
+--- a/tests/admin_changelist/tests.py
++++ b/tests/admin_changelist/tests.py
+@@ -911,19 +911,51 @@ def test_exact_lookup_mixed_terms(self):
+         cl = m.get_changelist_instance(request)
+         self.assertCountEqual(cl.queryset, [])
+ 
+-    def test_exact_lookup_with_more_lenient_formfield(self):
++    def test_exact_boolean_lookup_is_case_insensitive(self):
+         """
+         Exact lookups on BooleanField use formfield().to_python() for lenient
+-        parsing. Using model field's to_python() would reject 'false' whereas
+-        the form field accepts it.
++        parsing. Using model field's to_python() would reject 'FALSE' whereas
++        the admin's form field accepts it.
+         """
+-        obj = UnorderedObject.objects.create(bool=False)
++        obj_not_nullable = UnorderedObject.objects.create(bool=False)
+         UnorderedObject.objects.create(bool=True)
+         m = admin.ModelAdmin(UnorderedObject, custom_site)
+         m.search_fields = ["bool__exact"]
+ 
+-        # 'false' is accepted by form field but rejected by model field.
+-        request = self.factory.get("/", data={SEARCH_VAR: "false"})
++        # Nullable boolean field.
++        obj_nullable = Quartet.objects.create(plays_weddings=False)
++        Quartet.objects.create(plays_weddings=True)
++        m_nullable = admin.ModelAdmin(Quartet, custom_site)
++        m_nullable.search_fields = ["plays_weddings__exact"]
++
++        for obj, model_admin in (obj_not_nullable, m), (obj_nullable, m_nullable):
++            with self.subTest(obj=obj):
++                # 'FALSE' accepted by form field but rejected by model field.
++                request = self.factory.get("/", data={SEARCH_VAR: "FALSE"})
++                request.user = self.superuser
++
++                cl = model_admin.get_changelist_instance(request)
++                self.assertCountEqual(cl.queryset, [obj])
++
++    def test_exact_boolean_lookup_explicit_none(self):
++        UnorderedObject.objects.create(bool=False)
++        UnorderedObject.objects.create(bool=True)
++        m = admin.ModelAdmin(UnorderedObject, custom_site)
++        m.search_fields = ["bool__exact"]
++
++        request = self.factory.get("/", data={SEARCH_VAR: "None"})
++        request.user = self.superuser
++
++        cl = m.get_changelist_instance(request)
++        self.assertCountEqual(cl.queryset, [])
++
++        # Nullable boolean field.
++        obj = Quartet.objects.create()
++        Quartet.objects.create(plays_weddings=True)
++        m = admin.ModelAdmin(Quartet, custom_site)
++        m.search_fields = ["plays_weddings__exact"]
++
++        request = self.factory.get("/", data={SEARCH_VAR: "None"})
+         request.user = self.superuser
+ 
+         cl = m.get_changelist_instance(request)
+@@ -956,6 +988,86 @@ def test_exact_lookup_validates_each_field_independently(self):
+         cl = m.get_changelist_instance(request)
+         self.assertCountEqual(cl.queryset, [obj_int])
+ 
++    def test_exact_lookup_for_choices_field(self):
++        """
++        Search terms that aren't valid for an exact lookup on a field with
++        choices are skipped instead of crashing the changelist.
++        """
++        john = MixedFieldsModel.objects.create(name="john", choice_field=1)
++        mary = MixedFieldsModel.objects.create(name="mary", choice_field=2)
++        m = admin.ModelAdmin(MixedFieldsModel, custom_site)
++        m.search_fields = ["name", "choice_field__exact"]
++
++        for search_term, expected_result in [
++            ("john", [john]),
++            ("mary", [mary]),
++            ("1", [john]),
++            ("2", [mary]),
++            ("random", []),
++        ]:
++            request = self.factory.get("/", data={SEARCH_VAR: search_term})
++            request.user = self.superuser
++            with self.subTest(search_term=search_term):
++                cl = m.get_changelist_instance(request)
++                self.assertCountEqual(cl.queryset, expected_result)
++
++    def test_exact_lookup_for_choices_field_changelist_view(self):
++        """
++        The changelist view doesn't crash on a search term that isn't valid
++        for an exact lookup on a field with choices.
++        """
++        self.client.force_login(self.superuser)
++        john = MixedFieldsModel.objects.create(name="john", choice_field=1)
++        MixedFieldsModel.objects.create(name="mary", choice_field=2)
++        url = reverse("admin:admin_changelist_mixedfieldsmodel_changelist")
++
++        response = self.client.get(url, {SEARCH_VAR: "john"})
++
++        self.assertEqual(response.status_code, 200)
++        self.assertCountEqual(response.context["cl"].queryset, [john])
++
++    def test_exact_lookup_for_boolean_field(self):
++        """
++        Arbitrary search terms don't match every row with a True value for an
++        exact lookup on a BooleanField, while explicit boolean terms do match.
++        """
++        john = OrderedObject.objects.create(name="john", bool=True)
++        mary = OrderedObject.objects.create(name="mary", bool=True)
++        pete = OrderedObject.objects.create(name="pete", bool=False)
++        m = admin.ModelAdmin(OrderedObject, custom_site)
++        m.search_fields = ["name", "bool__exact"]
++
++        for search_term, expected_result in [
++            ("john", [john]),
++            ("mary", [mary]),
++            ("random", []),
++            ("true", [john, mary]),
++            ("True", [john, mary]),
++            ("1", [john, mary]),
++            ("false", [pete]),
++            ("False", [pete]),
++            ("0", [pete]),
++        ]:
++            request = self.factory.get("/", data={SEARCH_VAR: search_term})
++            request.user = self.superuser
++            with self.subTest(search_term=search_term):
++                cl = m.get_changelist_instance(request)
++                self.assertCountEqual(cl.queryset, expected_result)
++
++    def test_exact_lookup_for_null_boolean_field(self):
++        """
++        Arbitrary search terms don't match every row with a None value for an
++        exact lookup on a nullable BooleanField, while explicit terms do match.
++        """
++        Quartet.objects.create(plays_weddings=None)
++        model_admin = admin.ModelAdmin(Quartet, custom_site)
++        model_admin.search_fields = ["plays_weddings__exact"]
++
++        request = self.factory.get("/", data={SEARCH_VAR: "arbitrary"})
++        request.user = self.superuser
++        cl = model_admin.get_changelist_instance(request)
++        self.assertCountEqual(cl.queryset, [])
++
+     def test_search_with_exact_lookup_for_non_string_field(self):
+         child = Child.objects.create(name="Asher", age=11)
+         model_admin = ChildAdmin(Child, custom_site)

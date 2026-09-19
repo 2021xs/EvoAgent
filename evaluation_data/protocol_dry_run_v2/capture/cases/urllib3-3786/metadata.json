@@ -1,0 +1,70 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "dhoepp",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "e8a81de5e1fe6b52dbcbdd93345560097c1e58fb",
+  "base_snapshot_commit": "6111e13d35301d4b822703c3d40e41934c93de75",
+  "base_snapshot_ref": "refs/snapshots/urllib3-3786/base",
+  "base_tree_sha": "59d33e0f0c0cd04dabb4485a6ff218258673c915",
+  "body": "Found this while debugging SSL issues behind a corporate proxy in #3782. In forwarding mode there's only one TLS handshake and it was always using the destination ssl_context instead of the proxy one. Tunneling already worked because it has a dedicated _connect_tls_proxy() call. \r\n\r\nFix is a 4-line branch in connect() to pick the right context. Also added ValueError when ssl_context and use_forwarding_for_https=True are both set, per the issue spec.\r\n\r\n\r\nFixes #2577.\r\n\r\n\r\n\r\n## Root cause\r\n\r\nThe tunneling path (`proxy_is_tunneling`) was already handled correctly by `_connect_tls_proxy()`, which explicitly uses `proxy_config.ssl_context`. The forwarding path, however, fell through to the shared `_ssl_wrap_socket_and_match_hostname` call that always passed `self.ssl_context`.\r\n\r\n## History\r\n\r\nThe bug dates to 691679f7 (Sept 2020) when forwarding proxy support was first introduced — the forwarding path was added with `ssl_context=self.ssl_context` and never corrected.    \r\n\r\n## Fix\r\n\r\n\r\n```python\r\nif self.proxy_is_forwarding and self.proxy_config is not None:\r\n    tls_ssl_context = self.proxy_config.ssl_context\r\nelse:\r\n    tls_ssl_context = self.ssl_context\r\n```\r\n\r\n\r\n## Tests\r\n\r\n- Removed the `pytest.skip(\"Test is expected to fail due to urllib3/urllib3#2577\")` guard in `test_proxy_https_target_tls_error` — that test now passes directly.\r\n- Added `test_https_proxy_forwarding_uses_proxy_ssl_context` which verifies that an HTTPS forwarding proxy works correctly when only `proxy_ssl_context` is supplied (no `ca_certs` fallback).\r\n\r\n",
+  "captured_at": "2026-09-19T02:16:26.805125Z",
+  "case_id": "urllib3-3786",
+  "changed_files": [
+    {
+      "additions": 2,
+      "deletions": 0,
+      "path": "changelog/2577.bugfix.rst",
+      "previous_filename": null,
+      "status": "added"
+    },
+    {
+      "additions": 15,
+      "deletions": 1,
+      "path": "src/urllib3/connection.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 15,
+      "deletions": 0,
+      "path": "src/urllib3/poolmanager.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 133,
+      "deletions": 16,
+      "path": "test/with_dummyserver/test_proxy_poolmanager.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "multi-finding",
+  "diff_sha256": "7708494237d5cd26d86e5d10eb97106ea4bcad6b55be33ebd8ba62e2f7c24a7b",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "ca3151d13f9de266f14caa19c36ad6f4ed36657e",
+  "head_snapshot_commit": "9ff02fe3c872d23bb8b272207f8e444bfac13d47",
+  "head_snapshot_ref": "refs/snapshots/urllib3-3786/head",
+  "head_tree_sha": "f4a596a1ac445e5f3925d262a946a3f2e065c45f",
+  "license": {
+    "html_url": "https://github.com/urllib3/urllib3/blob/e8a81de5e1fe6b52dbcbdd93345560097c1e58fb/LICENSE.txt",
+    "name": "MIT License",
+    "path": "LICENSE.txt",
+    "spdx_id": "MIT"
+  },
+  "merged_at": "2026-06-12T13:27:09Z",
+  "protocol_dry_run": true,
+  "pull_request": 3786,
+  "repository_base_tip_sha_at_capture": "e8a81de5e1fe6b52dbcbdd93345560097c1e58fb",
+  "repository_id": "urllib3/urllib3",
+  "requested_sampling_category": "multi-finding",
+  "sampling_rationale": "Cross-layer proxy TLS change with implementation and integration tests chosen to stress multiple findings.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "urllib3/urllib3#3786",
+    "url": "https://github.com/urllib3/urllib3/pull/3786"
+  },
+  "title": "Fix proxy_ssl_context ignored for HTTPS forwarding proxies (#2577)"
+}

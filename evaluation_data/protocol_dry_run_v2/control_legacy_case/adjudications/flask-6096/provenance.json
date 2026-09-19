@@ -1,0 +1,55 @@
+{
+  "annotator_id": "flask-6096-adjudicator",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": true,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:23:47.748556Z",
+  "context_policy_hash": "0cfc0d10a0af493d72885e36b10c3c954d426067f22e0b5a96658253e7cd1073",
+  "context_policy_id": "frozen-repository-plus-a-b-evidence-v1",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "src/flask/app.py": 4,
+        "tests/test_basic.py": 2
+      },
+      "files_inspected": [
+        "src/flask/app.py",
+        "tests/test_basic.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 95497,
+      "repeat_file_reads": 4,
+      "repository_read_search_tool_calls": 6,
+      "tool_result_chars": 15223,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 2
+    },
+    "exit_code": 0,
+    "input_tokens": 95497,
+    "output_tokens": 1473,
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:23:02.658452Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:23:02.659547Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:23:12.558072Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n2026-09-19T02:23:12.559476Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n2026-09-19T02:23:33.625610Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n",
+    "tool_calls": 10,
+    "wall_clock_seconds": 45.124
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "731b45d50eb5c4b7e5747c03d797abe961cabd6d59f8e9ffd0d548bea5218395",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "ADJUDICATOR",
+  "run_id": "3505c80a-9f5f-4031-b5dd-aa92c6c5db32",
+  "started_at": "2026-09-19T02:23:02.623465Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

@@ -1,0 +1,113 @@
+{
+  "adjudication_cost": {
+    "execution_count": 2,
+    "input_tokens": 156607,
+    "output_tokens": 2561,
+    "tool_calls": 4,
+    "wall_clock_seconds_sum": 76.492
+  },
+  "adjudication_rate": {
+    "denominator": 8,
+    "numerator": 2,
+    "value": 0.25
+  },
+  "agreement": {
+    "full_agreement": {
+      "denominator": 8,
+      "numerator": 6,
+      "value": 0.75
+    },
+    "location": {
+      "denominator": 8,
+      "numerator": 7,
+      "value": 0.875
+    },
+    "logical_issue_identity": {
+      "denominator": 8,
+      "numerator": 7,
+      "value": 0.875
+    },
+    "severity": {
+      "denominator": 8,
+      "numerator": 7,
+      "value": 0.875
+    },
+    "should_comment_agreement": {
+      "denominator": 8,
+      "numerator": 7,
+      "value": 0.875
+    },
+    "taxonomy": {
+      "denominator": 8,
+      "numerator": 6,
+      "value": 0.75
+    },
+    "technical_agreement": {
+      "denominator": 8,
+      "numerator": 6,
+      "value": 0.75
+    },
+    "technical_existence": {
+      "denominator": 8,
+      "numerator": 7,
+      "value": 0.875
+    },
+    "unpaired_issue_rate": {
+      "denominator": 2,
+      "numerator": 1,
+      "value": 0.5
+    }
+  },
+  "annotation_guide_ambiguities": [
+    "The guide needed an explicit instruction not to report the bug intentionally fixed by the PR as a newly introduced issue.",
+    "Taxonomy synonyms such as error-handling vs error-handling-regression need normalization or documented adjudication semantics.",
+    "Objective regression evidence supports a specific change behavior but must not be treated as proof that a case is globally clean."
+  ],
+  "case_count": 8,
+  "claim_policy": "Protocol-methodology evidence only. No EvoAgent performance, resume, README, or final benchmark claim is permitted.",
+  "decision_gates": {
+    "annotation_protocol": "NEEDS REVISION",
+    "evidence_adjudication": "PRACTICAL",
+    "hybrid_matcher": "NOT JUSTIFIED",
+    "issue_pairing": "CURRENT STRUCTURE SUFFICIENT",
+    "repository_capture_package": "SUFFICIENT"
+  },
+  "final_claim_eligible": false,
+  "first_pass_cost": {
+    "execution_count": 16,
+    "input_tokens": 2630747,
+    "output_tokens": 30236,
+    "tool_calls": 84,
+    "wall_clock_seconds_sum": 977.0589999999997
+  },
+  "issue_pairing_problems": [
+    "Only two issue units exercised pairing: one path/range deterministic pair and one one-sided unpaired claim; evidence is too sparse to validate harder multi-finding pairing."
+  ],
+  "missing_context_rate": {
+    "denominator": 16,
+    "numerator": 0,
+    "value": 0.0
+  },
+  "model_adjudicated_count": 2,
+  "model_agreement_case_count": 6,
+  "objective_evidence_context_case_count": 2,
+  "objective_gold_case_count": 0,
+  "protocol_dry_run": true,
+  "quarantine_rate": {
+    "denominator": 8,
+    "numerator": 0,
+    "value": 0.0
+  },
+  "report_type": "EVIDENCE_ADJUDICATED_PROTOCOL_DRY_RUN",
+  "repository_context_gaps": [
+    "No annotator requested additional repository context; full frozen Git trees were sufficient for these cases.",
+    "Read-only sandboxing prevented temporary-file/heredoc experiments in some runs, but source inspection remained possible.",
+    "Requests PR 6963 title/body describes a CVE fix while the frozen base already contains hostname parsing; sampling categories must be verified against the actual base/head diff, not PR metadata alone."
+  ],
+  "repository_count": 5,
+  "schema_problems_discovered": [
+    "Schema v2 had no protocol_dry_run split and could only misclassify dry-run cases as formal splits; fixed with flag/split equivalence validation.",
+    "Independent annotations need local finding IDs plus a post-run pairing artifact; pre-coordinated logical_issue_id is not acceptable.",
+    "Strict model-output schemas required explicit type/items declarations for const and array fields."
+  ]
+}

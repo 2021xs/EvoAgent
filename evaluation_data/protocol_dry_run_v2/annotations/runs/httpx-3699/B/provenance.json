@@ -1,0 +1,74 @@
+{
+  "annotator_id": "httpx-3699-b",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:20:17.443861Z",
+  "context_policy_hash": "5275026e96c0210d5cd8bf09a04086b8a8a6afa2f715b1eec443c8e8b2f10050",
+  "context_policy_id": "frozen-repository-read-only-v2",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "httpx/__init__.py": 2,
+        "httpx/_auth.py": 1,
+        "httpx/_client.py": 1,
+        "httpx/_types.py": 2,
+        "pyproject.toml": 2,
+        "tests/client/test_auth.py": 1,
+        "tests/test_exported_members.py": 1
+      },
+      "files_inspected": [
+        "httpx/__init__.py",
+        "httpx/_auth.py",
+        "httpx/_client.py",
+        "httpx/_types.py",
+        "pyproject.toml",
+        "tests/client/test_auth.py",
+        "tests/test_exported_members.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 91110,
+      "repeat_file_reads": 3,
+      "repository_read_search_tool_calls": 4,
+      "tool_result_chars": 22973,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 7
+    },
+    "exit_code": 0,
+    "input_tokens": 91110,
+    "output_tokens": 582,
+    "repository_files_inspected": [
+      "httpx/__init__.py",
+      "httpx/_auth.py",
+      "httpx/_client.py",
+      "httpx/_types.py",
+      "pyproject.toml",
+      "tests/client/test_auth.py",
+      "tests/test_exported_members.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:19:50.986792Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:19:50.987709Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n",
+    "tool_calls": 4,
+    "wall_clock_seconds": 26.525
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1d786de07aad2d323b461ad779da1235259c4cce12e831c1fc618240fcce9744",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "94c96509-924e-44cb-a93d-22503f3527ce",
+  "started_at": "2026-09-19T02:19:50.954050Z",
+  "tool_policy_hash": "b03b2fcc21f87888da456f292e4ce1f6b9e583b964f0dcca32546e4e984679b5",
+  "tool_policy_id": "codex-bounded-read-only-v2"
+}

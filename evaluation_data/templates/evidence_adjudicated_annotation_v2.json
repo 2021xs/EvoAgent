@@ -10,8 +10,9 @@
   "head_sha": "REPLACE_WITH_40_OR_64_HEX",
   "diff_sha256": "REPLACE_WITH_64_LOWERCASE_HEX",
   "captured_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "split": "validation",
+  "split": "protocol_dry_run",
   "protocol_dry_run": true,
+  "final_claim_eligible": false,
   "related_cases": [],
   "diff": "REPLACE_WITH_FROZEN_DIFF",
   "annotators": [

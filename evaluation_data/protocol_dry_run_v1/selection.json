@@ -1,0 +1,17 @@
+{
+  "dataset_id": "evoagent-evidence-adjudicated-pr-protocol-dry-run",
+  "dataset_version": "0.1.0-protocol-dry-run",
+  "protocol_dry_run": true,
+  "final_claim_eligible": false,
+  "sampling_policy": "purposeful coverage across backend PR change types; selected without EvoAgent predictions",
+  "cases": [
+    {"case_id": "flask-6096", "repository": "pallets/flask", "pull_request": 6096, "coverage": "correctness-bug-fix", "sampling_rationale": "Small IPv6 parsing correction with regression tests."},
+    {"case_id": "flask-6133", "repository": "pallets/flask", "pull_request": 6133, "coverage": "feature", "sampling_rationale": "Small routing feature with framework-level behavior."},
+    {"case_id": "requests-6963", "repository": "psf/requests", "pull_request": 6963, "coverage": "security-sensitive-metadata-signal", "sampling_rationale": "Selected from the public PR title/body as security-sensitive; the later frozen-diff audit found that the captured base already contains the hostname parsing fix, so this case tests metadata-versus-source verification rather than a credential-fix diff."},
+    {"case_id": "requests-7025", "repository": "psf/requests", "pull_request": 7025, "coverage": "test-config-infrastructure", "sampling_rationale": "One-line pinned GitHub Action dependency update; likely-clean control candidate."},
+    {"case_id": "httpx-3690", "repository": "encode/httpx", "pull_request": 3690, "coverage": "correctness-feature", "sampling_rationale": "Protocol disconnect handling change with tests."},
+    {"case_id": "chi-1167", "repository": "go-chi/chi", "pull_request": 1167, "coverage": "refactor", "sampling_rationale": "Mechanical Go type-alias modernization across multiple files."},
+    {"case_id": "pytest-15044", "repository": "pytest-dev/pytest", "pull_request": 15044, "coverage": "correctness-error-handling", "sampling_rationale": "Cache write/close failure handling with regression coverage."},
+    {"case_id": "pytest-15057", "repository": "pytest-dev/pytest", "pull_request": 15057, "coverage": "likely-clean-small-change", "sampling_rationale": "Small dead-code removal explicitly described as uncovered legacy cleanup."}
+  ]
+}

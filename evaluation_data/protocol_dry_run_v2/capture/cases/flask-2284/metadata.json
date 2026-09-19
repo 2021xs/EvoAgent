@@ -1,0 +1,56 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "davidism",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "88120e9e9db38b6ccf851348542d5cd88e249881",
+  "base_snapshot_commit": "1c708b20949c17639d71d2e6e512a1b0a2e84fa7",
+  "base_snapshot_ref": "refs/snapshots/flask-2284/base",
+  "base_tree_sha": "f51013d4d9b1ac5261d96b28ebfa2f0cc15ebbdc",
+  "body": "Python on Windows supports mixed `/` and `\\` separators, so this doesn't break anything. `/` is already assumed to be the safe separator anyway.\r\n\r\nfixes #2033, closes #2059",
+  "captured_at": "2026-09-19T02:16:35.376822Z",
+  "case_id": "flask-2284",
+  "changed_files": [
+    {
+      "additions": 14,
+      "deletions": 8,
+      "path": "flask/helpers.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 12,
+      "deletions": 13,
+      "path": "tests/test_helpers.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "taxonomy-alias-heavy",
+  "diff_sha256": "90ffac60ac7b371fa88c0f601fd72094e321bb6ab781838fdaf59aae4910731a",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "2a6579430649d6514384ca592730c6995e140c43",
+  "head_snapshot_commit": "d3dbe3bb5e53bdf6d8311bbad49c1c5fcd49bc51",
+  "head_snapshot_ref": "refs/snapshots/flask-2284/head",
+  "head_tree_sha": "f10265fc3b5253f160c7b9810292634e84a3720c",
+  "license": {
+    "html_url": "https://github.com/pallets/flask/blob/88120e9e9db38b6ccf851348542d5cd88e249881/LICENSE",
+    "name": "Other",
+    "path": "LICENSE",
+    "spdx_id": "NOASSERTION"
+  },
+  "merged_at": "2017-05-16T00:11:35Z",
+  "protocol_dry_run": true,
+  "pull_request": 2284,
+  "repository_base_tip_sha_at_capture": "88120e9e9db38b6ccf851348542d5cd88e249881",
+  "repository_id": "pallets/flask",
+  "requested_sampling_category": "taxonomy-alias-heavy",
+  "sampling_rationale": "Safe path joining on Windows provides path-traversal/directory-traversal taxonomy alias pressure.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "pallets/flask#2284",
+    "url": "https://github.com/pallets/flask/pull/2284"
+  },
+  "title": "safe_join on Windows uses posixpath"
+}

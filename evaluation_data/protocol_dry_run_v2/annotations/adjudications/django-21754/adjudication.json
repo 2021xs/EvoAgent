@@ -1,0 +1,45 @@
+{
+  "case_id": "django-21754",
+  "adjudication_status": "MODEL_ADJUDICATED",
+  "pairings": [
+    {
+      "annotator_a_finding_id": "django-21754-a-1",
+      "annotator_b_finding_id": null,
+      "pairing_status": "UNPAIRED",
+      "pairing_reason": "ONE_SIDED_ISSUE",
+      "agreement": {
+        "technical_existence": false,
+        "logical_issue_identity": false,
+        "taxonomy": false,
+        "location": false,
+        "severity": false,
+        "should_comment": false
+      },
+      "resolved_finding": {
+        "issue_exists": true,
+        "should_comment": true,
+        "category": "search regression",
+        "cwe": null,
+        "path": "django/contrib/admin/options.py",
+        "start_line": 1376,
+        "end_line": 1389,
+        "severity": "low",
+        "evidence_refs": [
+          "django/contrib/admin/options.py:1333-1338",
+          "django/contrib/admin/options.py:1376-1389",
+          "django/forms/fields.py:893-915",
+          "django/forms/fields.py:941-943",
+          "django/db/models/fields/__init__.py:1156-1168",
+          "django/db/models/fields/__init__.py:2221-2225",
+          "tests/admin_changelist/models.py:153-155",
+          "tests/admin_changelist/tests.py:991-1012"
+        ],
+        "technical_rationale": "An exact search for \"01\" on the integer choice field reaches TypedChoiceField.clean(). ChoiceField validates \"01\" against choice key 1 before integer coercion, rejects it, and the admin skips that lookup. IntegerField.to_python(\"01\") returns 1, which would match a stored value of 1. The existing choice-field test covers \"1\" but not \"01\".",
+        "comment_usefulness_rationale": "The comment identifies a specific lost match and an uncovered input for the new search branch."
+      },
+      "rationale": "A’s finding is supported by the frozen tree’s search and field-validation paths. B reported no finding, so there is no counterpart to pair or compare on the remaining dimensions. The checkout contains a frozen-tree commit rather than the stated base and head objects; the base-side behavior is described in A’s record and is consistent with the shown code path."
+    }
+  ],
+  "missing_context_requests": [],
+  "summary": "Adjudicated A’s one-sided, low-severity integer-choice search regression as valid."
+}

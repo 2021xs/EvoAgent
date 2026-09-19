@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["case_id", "adjudication_status", "pairings", "missing_context_requests", "summary"],
+  "properties": {
+    "case_id": {"type": "string"}, "adjudication_status": {"enum": ["MODEL_ADJUDICATED", "QUARANTINED", "NEEDS_MORE_CONTEXT"]},
+    "pairings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["annotator_a_finding_id", "annotator_b_finding_id", "pairing_status", "pairing_reason", "agreement", "resolved_finding", "rationale"], "properties": {
+      "annotator_a_finding_id": {"type": ["string", "null"]}, "annotator_b_finding_id": {"type": ["string", "null"]},
+      "pairing_status": {"enum": ["DETERMINISTICALLY_PAIRED", "PAIRED_DURING_ADJUDICATION", "UNPAIRED"]},
+      "pairing_reason": {"enum": ["SAME_LOCATION", "DIFFERENT_LOCATION", "DIFFERENT_TAXONOMY", "DIFFERENT_ABSTRACTION_LEVEL", "ONE_SIDED_ISSUE"]},
+      "agreement": {"type": "object", "additionalProperties": false, "required": ["technical_existence", "logical_issue_identity", "taxonomy", "location", "severity", "should_comment"], "properties": {"technical_existence": {"type": "boolean"}, "logical_issue_identity": {"type": "boolean"}, "taxonomy": {"type": "boolean"}, "location": {"type": "boolean"}, "severity": {"type": "boolean"}, "should_comment": {"type": "boolean"}}},
+      "resolved_finding": {"type": ["object", "null"], "properties": {"issue_exists": {"type": "boolean"}, "should_comment": {"type": "boolean"}, "category": {"type": "string"}, "cwe": {"type": ["string", "null"]}, "path": {"type": "string"}, "start_line": {"type": "integer"}, "end_line": {"type": "integer"}, "severity": {"enum": ["low", "medium", "high", "critical"]}, "evidence_refs": {"type": "array", "items": {"type": "string"}}, "technical_rationale": {"type": "string"}, "comment_usefulness_rationale": {"type": "string"}}, "required": ["issue_exists", "should_comment", "category", "cwe", "path", "start_line", "end_line", "severity", "evidence_refs", "technical_rationale", "comment_usefulness_rationale"], "additionalProperties": false},
+      "rationale": {"type": "string"}
+    }}},
+    "missing_context_requests": {"type": "array", "items": {"type": "string"}}, "summary": {"type": "string"}
+  }
+}

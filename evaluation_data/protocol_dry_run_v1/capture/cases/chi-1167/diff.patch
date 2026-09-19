@@ -1,0 +1,150 @@
+diff --git a/middleware/compress.go b/middleware/compress.go
+index 3574dc08c..2b3653f23 100644
+--- a/middleware/compress.go
++++ b/middleware/compress.go
+@@ -182,7 +182,7 @@ func (c *Compressor) SetEncoder(encoding string, fn EncoderFunc) {
+ 	encoder := fn(io.Discard, c.level)
+ 	if _, ok := encoder.(ioResetterWriter); ok {
+ 		pool := &sync.Pool{
+-			New: func() interface{} {
++			New: func() any {
+ 				return fn(io.Discard, c.level)
+ 			},
+ 		}
+diff --git a/middleware/logger.go b/middleware/logger.go
+index ba5391f64..72e735fe4 100644
+--- a/middleware/logger.go
++++ b/middleware/logger.go
+@@ -67,8 +67,8 @@ type LogFormatter interface {
+ // LogEntry records the final log when a request completes.
+ // See defaultLogEntry for an example implementation.
+ type LogEntry interface {
+-	Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{})
+-	Panic(v interface{}, stack []byte)
++	Write(status, bytes int, header http.Header, elapsed time.Duration, extra any)
++	Panic(v any, stack []byte)
+ }
+ 
+ // GetLogEntry returns the in-context LogEntry for a request.
+@@ -85,7 +85,7 @@ func WithLogEntry(r *http.Request, entry LogEntry) *http.Request {
+ 
+ // LoggerInterface accepts printing to stdlib logger or compatible logger.
+ type LoggerInterface interface {
+-	Print(v ...interface{})
++	Print(v ...any)
+ }
+ 
+ // DefaultLogFormatter is a simple logger that implements a LogFormatter.
+@@ -137,7 +137,7 @@ type defaultLogEntry struct {
+ 	useColor bool
+ }
+ 
+-func (l *defaultLogEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
++func (l *defaultLogEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra any) {
+ 	switch {
+ 	case status < 200:
+ 		cW(l.buf, l.useColor, bBlue, "%03d", status)
+@@ -165,7 +165,7 @@ func (l *defaultLogEntry) Write(status, bytes int, header http.Header, elapsed t
+ 	l.Logger.Print(l.buf.String())
+ }
+ 
+-func (l *defaultLogEntry) Panic(v interface{}, stack []byte) {
++func (l *defaultLogEntry) Panic(v any, stack []byte) {
+ 	printPrettyStack(v, l.useColor)
+ }
+ 
+diff --git a/middleware/middleware_test.go b/middleware/middleware_test.go
+index 8836edd66..3c14e1e38 100644
+--- a/middleware/middleware_test.go
++++ b/middleware/middleware_test.go
+@@ -205,7 +205,7 @@ func assertError(t *testing.T, err error) {
+ 	}
+ }
+ 
+-func assertEqual(t *testing.T, a, b interface{}) {
++func assertEqual(t *testing.T, a, b any) {
+ 	t.Helper()
+ 	if !reflect.DeepEqual(a, b) {
+ 		t.Fatalf("expecting values to be equal but got: '%v' and '%v'", a, b)
+diff --git a/middleware/recoverer.go b/middleware/recoverer.go
+index ba77de74f..e82de6b68 100644
+--- a/middleware/recoverer.go
++++ b/middleware/recoverer.go
+@@ -51,14 +51,14 @@ func Recoverer(next http.Handler) http.Handler {
+ // for ability to test the PrintPrettyStack function
+ var recovererErrorWriter io.Writer = os.Stderr
+ 
+-func PrintPrettyStack(rvr interface{}) {
++func PrintPrettyStack(rvr any) {
+ 	printPrettyStack(rvr, true)
+ }
+ 
+ // printPrettyStack prints a formatted stack trace to stderr. When useColor is
+ // false, ANSI colour codes are suppressed, which is useful for terminals that
+ // do not support them (e.g. on Windows) or when output is being captured.
+-func printPrettyStack(rvr interface{}, useColor bool) {
++func printPrettyStack(rvr any, useColor bool) {
+ 	debugStack := debug.Stack()
+ 	s := prettyStack{}
+ 	out, err := s.parse(debugStack, rvr, useColor)
+@@ -73,7 +73,7 @@ func printPrettyStack(rvr interface{}, useColor bool) {
+ type prettyStack struct {
+ }
+ 
+-func (s prettyStack) parse(debugStack []byte, rvr interface{}, useColor bool) ([]byte, error) {
++func (s prettyStack) parse(debugStack []byte, rvr any, useColor bool) ([]byte, error) {
+ 	var err error
+ 	buf := &bytes.Buffer{}
+ 
+diff --git a/middleware/recoverer_test.go b/middleware/recoverer_test.go
+index 4a56b3422..29eda1fb9 100644
+--- a/middleware/recoverer_test.go
++++ b/middleware/recoverer_test.go
+@@ -14,7 +14,7 @@ func panickingHandler(http.ResponseWriter, *http.Request) { panic("foo") }
+ 
+ type testPrintLogger struct{}
+ 
+-func (testPrintLogger) Print(v ...interface{}) {}
++func (testPrintLogger) Print(v ...any) {}
+ 
+ func TestRecoverer(t *testing.T) {
+ 	r := chi.NewRouter()
+diff --git a/middleware/terminal.go b/middleware/terminal.go
+index 5ead7b924..5613318cd 100644
+--- a/middleware/terminal.go
++++ b/middleware/terminal.go
+@@ -52,7 +52,7 @@ func init() {
+ }
+ 
+ // colorWrite
+-func cW(w io.Writer, useColor bool, color []byte, s string, args ...interface{}) {
++func cW(w io.Writer, useColor bool, color []byte, s string, args ...any) {
+ 	if IsTTY && useColor {
+ 		w.Write(color)
+ 	}
+diff --git a/middleware/value.go b/middleware/value.go
+index a9dfd4345..fbb9573e1 100644
+--- a/middleware/value.go
++++ b/middleware/value.go
+@@ -6,7 +6,7 @@ import (
+ )
+ 
+ // WithValue is a middleware that sets a given key/value in a context chain.
+-func WithValue(key, val interface{}) func(next http.Handler) http.Handler {
++func WithValue(key, val any) func(next http.Handler) http.Handler {
+ 	return func(next http.Handler) http.Handler {
+ 		fn := func(w http.ResponseWriter, r *http.Request) {
+ 			r = r.WithContext(context.WithValue(r.Context(), key, val))
+diff --git a/mux.go b/mux.go
+index 234d74af4..7cfc6143d 100644
+--- a/mux.go
++++ b/mux.go
+@@ -51,7 +51,7 @@ type Mux struct {
+ // interface.
+ func NewMux() *Mux {
+ 	mux := &Mux{tree: &node{}, pool: &sync.Pool{}}
+-	mux.pool.New = func() interface{} {
++	mux.pool.New = func() any {
+ 		return NewRouteContext()
+ 	}
+ 	return mux

@@ -1,0 +1,43 @@
+{
+  "annotator_id": "httpx-3690-b",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-18T18:30:32.951265Z",
+  "context_policy_hash": "7f0d7977817d637917ee1ec7316f9af2ce726f35485a49ce5feebc347567fac9",
+  "context_policy_id": "frozen-repository-read-only-v1",
+  "execution": {
+    "exit_code": 0,
+    "input_tokens": 216578,
+    "output_tokens": 2678,
+    "repository_files_inspected": [
+      "pyproject.toml",
+      "src/ahttpx/_network.py",
+      "src/ahttpx/_parsers.py",
+      "src/ahttpx/_server.py",
+      "src/httpx/_network.py",
+      "src/httpx/_parsers.py",
+      "src/httpx/_server.py",
+      "tests/test_network.py",
+      "tests/test_parsers.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-18T18:29:10.583709Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:10.585452Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:10.587088Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:10.588511Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:10.590396Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:10.591885Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:29:15.573859Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\n",
+    "tool_calls": 7,
+    "wall_clock_seconds": 82.444
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1773244bd369e07ede1c38285b1beb371e54f2601f138cca1fa3f0d99b978a2c",
+  "prompt_version": "evidence-adjudication-guide-v1",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "aa69dc2d-4a50-4ca1-becc-e9cf9e7f6569",
+  "started_at": "2026-09-18T18:29:10.540393Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

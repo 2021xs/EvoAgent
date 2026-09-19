@@ -1,0 +1,41 @@
+{
+  "annotator_id": "requests-6963-a",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-18T18:26:49.689009Z",
+  "context_policy_hash": "183f87b1b3282d80610b75e5151e289271df24f9b77b8ab000c9beca8a8f8702",
+  "context_policy_id": "frozen-repository-read-only-v1",
+  "execution": {
+    "exit_code": 0,
+    "input_tokens": 155951,
+    "output_tokens": 1806,
+    "repository_files_inspected": [
+      "pyproject.toml",
+      "requirements-dev.txt",
+      "setup.cfg",
+      "setup.py",
+      "src/requests/utils.py",
+      "tests/test_utils.py",
+      "tox.ini"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-18T18:25:59.154000Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.155705Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.157100Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.158770Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.159874Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:26:36.071749Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n",
+    "tool_calls": 5,
+    "wall_clock_seconds": 50.613
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1773244bd369e07ede1c38285b1beb371e54f2601f138cca1fa3f0d99b978a2c",
+  "prompt_version": "evidence-adjudication-guide-v1",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "bbb4b748-7ee9-4293-a900-a3ec5817b3e0",
+  "started_at": "2026-09-18T18:25:59.112319Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

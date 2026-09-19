@@ -1,0 +1,77 @@
+[
+  {
+    "adjudication_status": "MODEL_ADJUDICATED",
+    "case_id": "django-21754",
+    "full_structured_agreement": false,
+    "pairing": {
+      "pairs": [],
+      "unpaired": [
+        {
+          "adjudication_outcome": "MODEL_ADJUDICATED",
+          "adjudication_reason": "ONE_SIDED_ISSUE",
+          "finding_id": "django-21754-a-1",
+          "reason": "ONE_SIDED_ISSUE",
+          "side": "A",
+          "status": "UNPAIRED"
+        }
+      ]
+    },
+    "should_comment_agreement": false,
+    "technical_agreement": false
+  },
+  {
+    "adjudication_status": null,
+    "case_id": "urllib3-3786",
+    "full_structured_agreement": true,
+    "pairing": {
+      "pairs": [],
+      "unpaired": []
+    },
+    "should_comment_agreement": true,
+    "technical_agreement": true
+  },
+  {
+    "adjudication_status": null,
+    "case_id": "flask-2284",
+    "full_structured_agreement": true,
+    "pairing": {
+      "pairs": [],
+      "unpaired": []
+    },
+    "should_comment_agreement": true,
+    "technical_agreement": true
+  },
+  {
+    "adjudication_status": null,
+    "case_id": "django-21867",
+    "full_structured_agreement": true,
+    "pairing": {
+      "pairs": [],
+      "unpaired": []
+    },
+    "should_comment_agreement": true,
+    "technical_agreement": true
+  },
+  {
+    "adjudication_status": null,
+    "case_id": "urllib3-4960",
+    "full_structured_agreement": true,
+    "pairing": {
+      "pairs": [],
+      "unpaired": []
+    },
+    "should_comment_agreement": true,
+    "technical_agreement": true
+  },
+  {
+    "adjudication_status": null,
+    "case_id": "httpx-3699",
+    "full_structured_agreement": true,
+    "pairing": {
+      "pairs": [],
+      "unpaired": []
+    },
+    "should_comment_agreement": true,
+    "technical_agreement": true
+  }
+]

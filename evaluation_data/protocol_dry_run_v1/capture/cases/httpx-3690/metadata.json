@@ -1,0 +1,67 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "lovelydinosaur",
+  "base_sha": "20380490fd0bd13c68704080754c1385bff96d69",
+  "base_snapshot_commit": "ac2a66f66b742cd3d46f018ccf208aaae7fc011d",
+  "base_snapshot_ref": "refs/snapshots/httpx-3690/base",
+  "base_tree_sha": "b052734911221ac009610387dfb77a130b6c8578",
+  "body": "Add `.wait_ready()` to `HTTPParser`...\r\n\r\nWe need this in order to differentiate between clean disconnects at the start of a new request/response cycle, rather than a `ProtocolError` while calling `recv_method_line()`.\r\n",
+  "captured_at": "2026-09-18T18:59:03.634232Z",
+  "case_id": "httpx-3690",
+  "changed_files": [
+    {
+      "additions": 16,
+      "deletions": 0,
+      "path": "src/ahttpx/_parsers.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 9,
+      "deletions": 1,
+      "path": "src/ahttpx/_server.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 16,
+      "deletions": 0,
+      "path": "src/httpx/_parsers.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 10,
+      "deletions": 5,
+      "path": "src/httpx/_server.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "correctness-feature",
+  "diff_sha256": "2305c7d114891be70399406e15b74e5c80b6b3ad249bb387ed1f077d67ee4085",
+  "final_claim_eligible": false,
+  "head_sha": "350221558d4f079fc4ab3673d81a4bc730fbb9c3",
+  "head_snapshot_commit": "1796222071e9a615f7950f3b37cf2dcaf3bcf187",
+  "head_snapshot_ref": "refs/snapshots/httpx-3690/head",
+  "head_tree_sha": "690fac63c01216fa112cfa1e5b7fc770f8b26ad2",
+  "license": {
+    "html_url": "https://api.github.com/licenses/bsd-3-clause",
+    "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+    "note": "Repository-level GitHub license metadata; no license file detected at frozen base revision.",
+    "path": null,
+    "spdx_id": "BSD-3-Clause"
+  },
+  "merged_at": "2025-10-13T14:00:49Z",
+  "protocol_dry_run": true,
+  "pull_request": 3690,
+  "repository_id": "encode/httpx",
+  "sampling_rationale": "Protocol disconnect handling change with tests.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "encode/httpx#3690",
+    "url": "https://github.com/encode/httpx/pull/3690"
+  },
+  "title": "Add `.wait_ready` to parser for clean server disconnects"
+}

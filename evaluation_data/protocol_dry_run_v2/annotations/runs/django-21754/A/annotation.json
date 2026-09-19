@@ -1,0 +1,57 @@
+{
+  "case_id": "django-21754",
+  "annotator_id": "django-21754-a",
+  "annotation_status": "COMPLETE",
+  "source": {
+    "base_sha": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+    "head_sha": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+    "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY"
+  },
+  "findings": [
+    {
+      "annotation_finding_id": "django-21754-a-1",
+      "issue_exists": true,
+      "should_comment": true,
+      "category": "search regression",
+      "cwe": null,
+      "path": "django/contrib/admin/options.py",
+      "start_line": 1376,
+      "end_line": 1384,
+      "severity": "low",
+      "evidence_refs": [
+        {
+          "path": "django/contrib/admin/options.py",
+          "start_line": 1376,
+          "end_line": 1389,
+          "revision": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+          "description": "The new branch calls clean() for choice fields and skips the lookup on ValidationError."
+        },
+        {
+          "path": "django/forms/fields.py",
+          "start_line": 895,
+          "end_line": 915,
+          "revision": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+          "description": "Choice validation compares the search string with choice keys before type coercion."
+        },
+        {
+          "path": "tests/admin_changelist/models.py",
+          "start_line": 151,
+          "end_line": 155,
+          "revision": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+          "description": "The added test model has an integer choice field with choice key 1."
+        },
+        {
+          "path": "django/contrib/admin/options.py",
+          "start_line": 1359,
+          "end_line": 1371,
+          "revision": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+          "description": "The previous path used the form field's to_python() without choice validation."
+        }
+      ],
+      "technical_rationale": "For an IntegerField choice with key 1, searching for \"01\" is a valid exact integer lookup: the database field can convert it to 1. TypedChoiceField.clean() first validates the literal \"01\" against choice key \"1\", rejects it, and the admin skips the lookup. The same search previously matched rows whose value was 1.",
+      "comment_usefulness_rationale": "This identifies a specific search regression and a case the new choice-field tests do not cover."
+    }
+  ],
+  "missing_context_requests": [],
+  "review_summary": "Reviewed the frozen diff and bounded search, form-field, model-field, and test code. Found one low-severity regression in exact searches on integer fields with choices."
+}

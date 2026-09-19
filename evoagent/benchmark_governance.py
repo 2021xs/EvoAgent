@@ -23,6 +23,7 @@ from .models import Finding, Severity
 BENCHMARK_SCHEMA_VERSION = 2
 BENCHMARK_SPLITS = {
     "evolution_feedback", "validation", "operational_gating", "final_holdout",
+    "protocol_dry_run",
 }
 BENCHMARK_PROVENANCE = {"public-github-pr", "private-historical-pr"}
 ANNOTATION_FINAL_STATUSES = {"ADJUDICATED", "QUARANTINED", "NEEDS_MORE_CONTEXT"}
@@ -41,6 +42,16 @@ REPOSITORY_ACCESS_MODES = {
 GOLD_EVIDENCE_LEVELS = {
     "OBJECTIVE", "INDEPENDENT_MODEL_AGREEMENT", "MODEL_ADJUDICATED",
     "HUMAN_ADJUDICATED", "QUARANTINED",
+}
+OBJECTIVE_EVIDENCE_SCOPES = {
+    "FINDING_EXISTENCE", "FINDING_BEHAVIOR", "LOCATION", "SEVERITY",
+    "WHOLE_CASE_CLEAN", "OBSERVABLE_FAILURE_LAYER", "EVOLUTION_ROUTE",
+}
+TAXONOMY_CATEGORY_ALIASES = {
+    "error-handling-regression": "error-handling",
+    "error-handling-robustness": "error-handling",
+    "path-traversal": "path-traversal",
+    "directory-traversal": "path-traversal",
 }
 AGREEMENT_DIMENSIONS = {
     "technical_existence": "issue_exists",
@@ -138,13 +149,58 @@ def _validate_objective_evidence(value: Any, path: str, source_revision: str) ->
         item_path = "%s[%d]" % (path, index)
         if not isinstance(item, Mapping):
             raise BenchmarkValidationError(item_path + " must be an object")
-        _required(item, ("evidence_kind", "source_revision", "evidence_refs", "rationale"), item_path)
+        _required(item, ("evidence_kind", "source_revision", "evidence_refs", "rationale", "scope"), item_path)
         _nonempty(item["evidence_kind"], item_path + ".evidence_kind")
         if str(item["source_revision"]) != str(source_revision):
             raise BenchmarkValidationError(item_path + " must bind the frozen source revision")
         if not isinstance(item["evidence_refs"], list) or not item["evidence_refs"]:
             raise BenchmarkValidationError(item_path + ".evidence_refs must be non-empty")
         _nonempty(item["rationale"], item_path + ".rationale")
+        scopes = item["scope"]
+        if not isinstance(scopes, list) or not scopes or any(scope not in OBJECTIVE_EVIDENCE_SCOPES for scope in scopes):
+            raise BenchmarkValidationError(item_path + ".scope has unsupported objective-evidence scope")
+        if "WHOLE_CASE_CLEAN" in scopes:
+            if item["evidence_kind"] not in {
+                "exhaustive-deterministic-proof", "exhaustive-static-enumeration",
+            }:
+                raise BenchmarkValidationError(
+                    item_path + " regression or fix evidence cannot prove WHOLE_CASE_CLEAN"
+                )
+            _nonempty(item.get("coverage_rationale"), item_path + ".coverage_rationale")
+
+
+def normalize_taxonomy(cwe: Any = None, category: Any = None) -> Dict[str, Optional[str]]:
+    """Return an auditable deterministic taxonomy identity without semantic guessing."""
+    raw_cwe = None if cwe in (None, "") else str(cwe).strip()
+    raw_category = None if category in (None, "") else str(category).strip()
+    canonical_cwe = None
+    if raw_cwe:
+        compact = re.sub(r"[^A-Za-z0-9]", "", raw_cwe).upper()
+        match = re.fullmatch(r"CWE(\d+)", compact)
+        canonical_cwe = "CWE-%d" % int(match.group(1)) if match else raw_cwe.upper()
+    canonical_category = None
+    if raw_category:
+        formatted = re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", raw_category.lower())).strip("-")
+        canonical_category = TAXONOMY_CATEGORY_ALIASES.get(formatted, formatted)
+    return {
+        "raw_cwe": raw_cwe, "raw_category": raw_category,
+        "canonical_cwe": canonical_cwe, "canonical_category": canonical_category,
+        "canonical_identity": canonical_cwe or canonical_category,
+        "normalization_method": "canonical-cwe" if canonical_cwe else "explicit-alias-or-format",
+    }
+
+
+def taxonomy_equivalent(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    """Compare a shared CWE when supplied by both; otherwise compare named categories.
+
+    A missing reviewer CWE must not turn an otherwise identical category into
+    a disagreement, nor may a conflicting pair of present CWEs be erased.
+    """
+    a = normalize_taxonomy(left.get("cwe"), left.get("category"))
+    b = normalize_taxonomy(right.get("cwe"), right.get("category"))
+    if a["canonical_cwe"] and b["canonical_cwe"]:
+        return a["canonical_cwe"] == b["canonical_cwe"]
+    return a["canonical_category"] == b["canonical_category"]
 
 
 def _validate_reviewer_label(label: Mapping[str, Any], path: str) -> None:
@@ -164,12 +220,24 @@ def _validate_reviewer_label(label: Mapping[str, Any], path: str) -> None:
     _validate_timestamp(label["submitted_at"], path + ".submitted_at")
 
 
+def objective_evidence_scopes(value: Sequence[Mapping[str, Any]]) -> set:
+    return {
+        scope
+        for item in value or []
+        for scope in (item.get("scope") if isinstance(item.get("scope"), list) else [item.get("scope")])
+        if scope
+    }
+
+
 def compare_annotation_labels(left: Mapping[str, Any], right: Mapping[str, Any]) -> Dict[str, bool]:
     """Compare independently authored labels by semantic dimension."""
     comparison = {}
     for dimension, fields in AGREEMENT_DIMENSIONS.items():
         names = fields if isinstance(fields, tuple) else (fields,)
-        comparison[dimension] = all(left.get(name) == right.get(name) for name in names)
+        if dimension == "taxonomy":
+            comparison[dimension] = taxonomy_equivalent(left, right)
+        else:
+            comparison[dimension] = all(left.get(name) == right.get(name) for name in names)
     comparison["technical_agreement"] = all(
         comparison[name] for name in (
             "technical_existence", "logical_issue_identity", "taxonomy", "location", "severity",
@@ -178,6 +246,73 @@ def compare_annotation_labels(left: Mapping[str, Any], right: Mapping[str, Any])
     comparison["comment_usefulness_agreement"] = comparison["should_comment"]
     comparison["full_agreement"] = comparison["technical_agreement"] and comparison["comment_usefulness_agreement"]
     return comparison
+
+
+def validate_sampling_admission(
+    record: Mapping[str, Any], captured_case: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Validate post-capture, prediction-blind sampling classification."""
+    _required(record, (
+        "case_id", "requested_sampling_category", "verified_sampling_category",
+        "verification_rationale", "evidence_refs", "captured_diff_sha256",
+        "evoagent_prediction_visible", "decision",
+    ), "sampling_admission")
+    if str(record["case_id"]) != str(captured_case.get("case_id")):
+        raise BenchmarkValidationError("sampling admission case_id does not match capture")
+    if str(record["captured_diff_sha256"]) != str(captured_case.get("diff_sha256")):
+        raise BenchmarkValidationError("sampling admission must bind the frozen diff hash")
+    _nonempty(record["requested_sampling_category"], "requested_sampling_category")
+    _nonempty(record["verified_sampling_category"], "verified_sampling_category")
+    _nonempty(record["verification_rationale"], "verification_rationale")
+    if not isinstance(record["evidence_refs"], list) or not record["evidence_refs"]:
+        raise BenchmarkValidationError("sampling admission requires frozen-diff evidence refs")
+    if record["evoagent_prediction_visible"] is not False:
+        raise BenchmarkValidationError("sampling verification must be blind to EvoAgent predictions")
+    if record["decision"] not in {"ADMIT", "REJECT"}:
+        raise BenchmarkValidationError("sampling admission decision must be ADMIT or REJECT")
+    if record["decision"] == "ADMIT" and not record["verified_sampling_category"]:
+        raise BenchmarkValidationError("admitted sampling case requires verified category")
+    return json.loads(canonical_json(record))
+
+
+def instrument_annotation_trace(
+    events: Sequence[Mapping[str, Any]], repository_files: Sequence[str],
+) -> Dict[str, Any]:
+    """Measure observable repository-read cost without inventing token attribution."""
+    read_markers = ("git diff", "git show", "git grep", "rg ", "sed ", "cat ", "head ", "tail ")
+    read_calls = []
+    file_reads: Dict[str, int] = {}
+    tool_result_chars = 0
+    for event in events:
+        item = event.get("item") or {}
+        if event.get("type") != "item.completed" or item.get("type") != "command_execution":
+            continue
+        command = str(item.get("command") or "")
+        output = str(item.get("aggregated_output") or "")
+        tool_result_chars += len(output)
+        if any(marker in command for marker in read_markers):
+            read_calls.append(command)
+            for path in repository_files:
+                if path and path in command:
+                    file_reads[path] = file_reads.get(path, 0) + 1
+    usage = next((event.get("usage") for event in reversed(events) if event.get("usage")), {}) or {}
+    return {
+        "files_inspected": sorted(file_reads),
+        "unique_files_inspected": len(file_reads),
+        "repository_read_search_tool_calls": len(read_calls),
+        "repeat_file_reads": sum(max(0, count - 1) for count in file_reads.values()),
+        "file_read_counts": dict(sorted(file_reads.items())),
+        "tool_result_chars": tool_result_chars,
+        "tool_result_token_volume": None,
+        "input_tokens": usage.get("input_tokens"),
+        "input_token_breakdown": {
+            "initial_instruction_context": None,
+            "repository_tool_observations": None,
+            "repeat_reads": None,
+            "other_model_context": None,
+            "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        },
+    }
 
 
 def _validate_finding(
@@ -240,6 +375,8 @@ def _validate_finding(
         raise BenchmarkValidationError(path + " has invalid gold_evidence_level")
     if level == "OBJECTIVE":
         _validate_objective_evidence(finding["objective_evidence"], path + ".objective_evidence", source_revision)
+        if "FINDING_EXISTENCE" not in objective_evidence_scopes(finding["objective_evidence"]):
+            raise BenchmarkValidationError(path + " OBJECTIVE finding requires FINDING_EXISTENCE scope")
         if not any(item["annotator_kind"] == "OBJECTIVE_EVIDENCE" for item in annotators.values()):
             raise BenchmarkValidationError(path + " OBJECTIVE gold requires objective-evidence annotator provenance")
     elif finding["objective_evidence"] not in (None, []):
@@ -307,6 +444,7 @@ def finding_qualifies_for_primary_gold(
     if level == "OBJECTIVE":
         return bool(
             finding.get("objective_evidence")
+            and "FINDING_EXISTENCE" in objective_evidence_scopes(finding["objective_evidence"])
             and any(item["annotator_kind"] == "OBJECTIVE_EVIDENCE" for item in annotators.values())
         )
     labels = finding.get("reviewer_labels") or []
@@ -316,7 +454,11 @@ def finding_qualifies_for_primary_gold(
             and compare_annotation_labels(labels[0], labels[1])["full_agreement"]
             and all(
                 all(
-                    finding.get("issue_id" if name == "logical_issue_id" else name) == label.get(name)
+                    (
+                        taxonomy_equivalent(finding, label)
+                        if name in {"category", "cwe"}
+                        else finding.get("issue_id" if name == "logical_issue_id" else name) == label.get(name)
+                    )
                     for name in (fields if isinstance(fields, tuple) else (fields,))
                 )
                 for label in labels[:2]
@@ -333,7 +475,14 @@ def finding_qualifies_for_primary_gold(
             and adjudicator["role"] == "ADJUDICATOR"
             and not adjudicator["blindness"]["evoagent_prediction_visible"]
             and not adjudicator["blindness"]["experiment_arm_visible"]
-            and not compare_annotation_labels(labels[0], labels[1])["full_agreement"]
+            # Older frozen adjudications recorded a raw taxonomy-alias
+            # disagreement. Normalization is derived analysis and must not
+            # invalidate or rewrite that already-adjudicated experiment.
+            and (
+                not compare_annotation_labels(labels[0], labels[1])["full_agreement"]
+                or labels[0].get("category") != labels[1].get("category")
+                or labels[0].get("cwe") != labels[1].get("cwe")
+            )
         )
     return False
 
@@ -353,6 +502,7 @@ def case_qualifies_for_primary_gold(case: Mapping[str, Any]) -> bool:
     if level == "OBJECTIVE":
         return bool(
             clean.get("objective_evidence")
+            and "WHOLE_CASE_CLEAN" in objective_evidence_scopes(clean["objective_evidence"])
             and any(item["annotator_kind"] == "OBJECTIVE_EVIDENCE" for item in annotators.values())
         )
     reviews = case.get("reviewer_records") or []
@@ -473,6 +623,10 @@ def validate_benchmark_case(case: Mapping[str, Any]) -> Dict[str, Any]:
             _validate_objective_evidence(
                 clean["objective_evidence"], "case.clean_review.objective_evidence", str(case["head_sha"]),
             )
+            if "WHOLE_CASE_CLEAN" not in objective_evidence_scopes(clean["objective_evidence"]):
+                raise BenchmarkValidationError(
+                    "OBJECTIVE clean gold requires WHOLE_CASE_CLEAN scope"
+                )
             if not any(item["annotator_kind"] == "OBJECTIVE_EVIDENCE" for item in annotators.values()):
                 raise BenchmarkValidationError("OBJECTIVE clean gold requires objective-evidence annotator provenance")
         elif clean["gold_evidence_level"] == "INDEPENDENT_MODEL_AGREEMENT":
@@ -512,6 +666,14 @@ def validate_benchmark_case(case: Mapping[str, Any]) -> Dict[str, Any]:
         _nonempty(relation.get("case_id"), "related case_id")
     if case.get("protocol_dry_run") not in (None, False, True):
         raise BenchmarkValidationError("protocol_dry_run must be boolean")
+    if bool(case.get("protocol_dry_run")) != (case["split"] == "protocol_dry_run"):
+        raise BenchmarkValidationError(
+            "protocol_dry_run flag and split must identify the same non-claim dataset"
+        )
+    if case.get("protocol_dry_run") and case.get("final_claim_eligible") is not False:
+        raise BenchmarkValidationError(
+            "protocol dry-run cases must explicitly set final_claim_eligible=false"
+        )
     return json.loads(canonical_json(case))
 
 

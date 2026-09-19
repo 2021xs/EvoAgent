@@ -1,0 +1,63 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "illia-v",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "c21b1c16cd8c08dd26876e223bc198a2b4de4fb3",
+  "base_snapshot_commit": "ce5ca7e10f1953eae82d376bfaf4c0b7a7a408a4",
+  "base_snapshot_ref": "refs/snapshots/urllib3-4960/base",
+  "base_tree_sha": "3cd78b3332d8470ce475fa0fc8be92d4e1fff3d2",
+  "body": "Fixes #3636\r\n\r\nA partial read could leave some data inside `_decoded_buffer`, this buffered data was ignored during the next full read with `amt=None`.",
+  "captured_at": "2026-09-19T02:16:51.940136Z",
+  "case_id": "urllib3-4960",
+  "changed_files": [
+    {
+      "additions": 2,
+      "deletions": 0,
+      "path": "changelog/3636.bugfix.rst",
+      "previous_filename": null,
+      "status": "added"
+    },
+    {
+      "additions": 6,
+      "deletions": 0,
+      "path": "src/urllib3/response.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 29,
+      "deletions": 0,
+      "path": "test/test_response.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "strong-objective-evidence",
+  "diff_sha256": "07036c7c75e032f9c835a4821f0fb605c3560811ee7db13cbe35d94dcb5cb8ef",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "ea687a19a86d8d0fcbc16c0737c41512efc80e87",
+  "head_snapshot_commit": "149100557dc685199e088cf0126a521c70819a91",
+  "head_snapshot_ref": "refs/snapshots/urllib3-4960/head",
+  "head_tree_sha": "c40868c0413586983fabd2dcfce6c8c1cf81db1e",
+  "license": {
+    "html_url": "https://github.com/urllib3/urllib3/blob/c21b1c16cd8c08dd26876e223bc198a2b4de4fb3/LICENSE.txt",
+    "name": "MIT License",
+    "path": "LICENSE.txt",
+    "spdx_id": "MIT"
+  },
+  "merged_at": "2026-04-28T18:56:14Z",
+  "protocol_dry_run": true,
+  "pull_request": 4960,
+  "repository_base_tip_sha_at_capture": "c21b1c16cd8c08dd26876e223bc198a2b4de4fb3",
+  "repository_id": "urllib3/urllib3",
+  "requested_sampling_category": "strong-objective-evidence",
+  "sampling_rationale": "Focused response-read correction includes a concrete reproducer-style regression test.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "urllib3/urllib3#4960",
+    "url": "https://github.com/urllib3/urllib3/pull/4960"
+  },
+  "title": "Fix full read with `amt=None` after a partial read"
+}

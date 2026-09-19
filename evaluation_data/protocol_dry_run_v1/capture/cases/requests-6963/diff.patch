@@ -1,0 +1,57 @@
+diff --git a/src/requests/utils.py b/src/requests/utils.py
+index 8a307ca8a0..8ab55852cc 100644
+--- a/src/requests/utils.py
++++ b/src/requests/utils.py
+@@ -219,14 +219,7 @@ def get_netrc_auth(url, raise_errors=False):
+         netrc_path = None
+ 
+         for f in netrc_locations:
+-            try:
+-                loc = os.path.expanduser(f)
+-            except KeyError:
+-                # os.path.expanduser can fail when $HOME is undefined and
+-                # getpwuid fails. See https://bugs.python.org/issue20164 &
+-                # https://github.com/psf/requests/issues/1846
+-                return
+-
++            loc = os.path.expanduser(f)
+             if os.path.exists(loc):
+                 netrc_path = loc
+                 break
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+index 5e9b56ea64..f9a287af1b 100644
+--- a/tests/test_utils.py
++++ b/tests/test_utils.py
+@@ -23,6 +23,7 @@
+     get_encoding_from_headers,
+     get_encodings_from_content,
+     get_environ_proxies,
++    get_netrc_auth,
+     guess_filename,
+     guess_json_utf,
+     is_ipv4_address,
+@@ -152,6 +153,24 @@ def test_super_len_with_no_matches(self):
+         assert super_len(object()) == 0
+ 
+ 
++class TestGetNetrcAuth:
++    def test_works(self, tmp_path, monkeypatch):
++        netrc_path = tmp_path / ".netrc"
++        monkeypatch.setenv("NETRC", str(netrc_path))
++        with open(netrc_path, "w") as f:
++            f.write("machine example.com login aaaa password bbbb\n")
++        auth = get_netrc_auth("http://example.com/thing")
++        assert auth == ("aaaa", "bbbb")
++
++    def test_not_vulnerable_to_bad_url_parsing(self, tmp_path, monkeypatch):
++        netrc_path = tmp_path / ".netrc"
++        monkeypatch.setenv("NETRC", str(netrc_path))
++        with open(netrc_path, "w") as f:
++            f.write("machine example.com login aaaa password bbbb\n")
++        auth = get_netrc_auth("http://example.com:@evil.com/&apos;")
++        assert auth is None
++
++
+ class TestToKeyValList:
+     @pytest.mark.parametrize(
+         "value, expected",

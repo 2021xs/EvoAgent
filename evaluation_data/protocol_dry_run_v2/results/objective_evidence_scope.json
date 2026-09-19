@@ -1,0 +1,17 @@
+{
+  "protocol_dry_run": true,
+  "final_claim_eligible": false,
+  "records": [
+    {
+      "case_id": "urllib3-4960",
+      "evidence_kind": "fix-commit-plus-matching-regression-tests",
+      "source_revision": "ea687a19a86d8d0fcbc16c0737c41512efc80e87",
+      "scope": ["FINDING_BEHAVIOR"],
+      "evidence_refs": ["src/urllib3/response.py:1114", "test/test_response.py:898"],
+      "rationale": "The frozen diff includes regression assertions for full reads after buffered and unbuffered partial reads. This supports the intended change behavior only, not a newly introduced finding or whole-case cleanliness.",
+      "runtime_executed": false,
+      "runtime_validation_status": "BLOCKED_MISSING_GENERATED_MODULE",
+      "runtime_validation_detail": "Frozen source archive lacks generated urllib3._version, and pytest fails during conftest import before either selected test executes. No build output was injected into the frozen source."
+    }
+  ]
+}

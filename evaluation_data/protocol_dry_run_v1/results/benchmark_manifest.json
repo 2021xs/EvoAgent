@@ -1,0 +1,47 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "annotation_version": "evidence-adjudication-guide-v1",
+  "canonical_content_sha256": "ee3d7135723837b5c0d13a145e254cc04885e273d1bad41a93e99c80f2d71eec",
+  "case_ids": [
+    "chi-1167",
+    "flask-6096",
+    "flask-6133",
+    "httpx-3690",
+    "pytest-15044",
+    "pytest-15057",
+    "requests-6963",
+    "requests-7025"
+  ],
+  "dataset_id": "evoagent-evidence-adjudicated-pr-protocol-dry-run",
+  "dataset_version": "0.1.0-protocol-dry-run",
+  "manifest_sha256": "1b437b89c0e7aa31268948401b20e333eefd7efa834dc54afc3ce6176000d7cb",
+  "matcher_version": "deterministic-v1",
+  "metric_contract_version": "final-metrics-v2",
+  "provenance_policy": {
+    "allowed": [
+      "private-historical-pr",
+      "public-github-pr"
+    ],
+    "immutable_revision_required": true
+  },
+  "raw_content_sha256": "f36c00ddc96c5f1f8b2ab9debf94e52fd74b4ad9c2a30202c157dd67bcbd68c4",
+  "repository_ids": [
+    "encode/httpx",
+    "go-chi/chi",
+    "pallets/flask",
+    "psf/requests",
+    "pytest-dev/pytest"
+  ],
+  "sampling_policy_version": "purposeful-coverage-v1",
+  "schema_version": 2,
+  "split_assignment": {
+    "chi-1167": "protocol_dry_run",
+    "flask-6096": "protocol_dry_run",
+    "flask-6133": "protocol_dry_run",
+    "httpx-3690": "protocol_dry_run",
+    "pytest-15044": "protocol_dry_run",
+    "pytest-15057": "protocol_dry_run",
+    "requests-6963": "protocol_dry_run",
+    "requests-7025": "protocol_dry_run"
+  }
+}

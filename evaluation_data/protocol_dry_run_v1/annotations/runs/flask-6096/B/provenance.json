@@ -1,0 +1,39 @@
+{
+  "annotator_id": "flask-6096-b",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-18T18:27:05.755031Z",
+  "context_policy_hash": "0cfc0d10a0af493d72885e36b10c3c954d426067f22e0b5a96658253e7cd1073",
+  "context_policy_id": "frozen-repository-read-only-v1",
+  "execution": {
+    "exit_code": 0,
+    "input_tokens": 201051,
+    "output_tokens": 2493,
+    "repository_files_inspected": [
+      "docs/config.rst",
+      "src/flask/app.py",
+      "src/flask/testing.py",
+      "tests/test_basic.py",
+      "tests/test_testing.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-18T18:25:59.113593Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.115990Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.117740Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.118908Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:25:59.120042Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:26:29.435782Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n2026-09-18T18:26:56.800495Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n",
+    "tool_calls": 5,
+    "wall_clock_seconds": 66.722
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1773244bd369e07ede1c38285b1beb371e54f2601f138cca1fa3f0d99b978a2c",
+  "prompt_version": "evidence-adjudication-guide-v1",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "2440dda6-f073-48c9-ba06-3c3947abc9e0",
+  "started_at": "2026-09-18T18:25:59.053012Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

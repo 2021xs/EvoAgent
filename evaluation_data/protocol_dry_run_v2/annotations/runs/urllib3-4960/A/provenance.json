@@ -1,0 +1,59 @@
+{
+  "annotator_id": "urllib3-4960-a",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:19:20.559273Z",
+  "context_policy_hash": "cf5cb164dcffea6665464d3590112561712650e58bd0a450bd2a656e51990d0b",
+  "context_policy_id": "frozen-repository-read-only-v2",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "src/urllib3/response.py": 3,
+        "test/test_response.py": 1
+      },
+      "files_inspected": [
+        "src/urllib3/response.py",
+        "test/test_response.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 91607,
+      "repeat_file_reads": 2,
+      "repository_read_search_tool_calls": 4,
+      "tool_result_chars": 27606,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 2
+    },
+    "exit_code": 0,
+    "input_tokens": 91607,
+    "output_tokens": 572,
+    "repository_files_inspected": [
+      "src/urllib3/response.py",
+      "test/test_response.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:18:53.120496Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:18:53.121319Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n",
+    "tool_calls": 4,
+    "wall_clock_seconds": 27.522
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "7a2ed06503ab349f38875efed4689bb2dd82c5a84577faf8da9dd7a17ca6ce23",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "ecb4a955-bbde-4f7e-8aeb-3de0a603fc6c",
+  "started_at": "2026-09-19T02:18:53.058231Z",
+  "tool_policy_hash": "b03b2fcc21f87888da456f292e4ce1f6b9e583b964f0dcca32546e4e984679b5",
+  "tool_policy_id": "codex-bounded-read-only-v2"
+}

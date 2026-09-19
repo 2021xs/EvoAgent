@@ -1,0 +1,30 @@
+{
+  "final_claim_eligible": false,
+  "protocol_dry_run": true,
+  "records": [
+    {
+      "case_id": "flask-6096",
+      "evidence_kind": "fix-commit-plus-matching-regression-tests",
+      "evidence_refs": [
+        "tests/test_basic.py:1913",
+        "tests/test_testing.py:175"
+      ],
+      "rationale": "Frozen head adds IPv6-specific assertions matching the urlsplit-based host parsing change; this verifies the intended scenario but does not prove the PR is globally issue-free.",
+      "runtime_executed": false,
+      "scope": "CHANGE_BEHAVIOR_ONLY_NOT_CLEAN_GOLD",
+      "source_revision": "7203feabf723edae0286ae5dc64fec8ac4c91735"
+    },
+    {
+      "case_id": "pytest-15044",
+      "evidence_kind": "fix-commit-plus-matching-regression-test",
+      "evidence_refs": [
+        "src/_pytest/cacheprovider.py:243",
+        "testing/test_cacheprovider.py:109-131"
+      ],
+      "rationale": "Frozen head uses Path.write_text inside the OSError boundary and adds parameterized open/write/close failure assertions; this supports the specific error-handling behavior only.",
+      "runtime_executed": false,
+      "scope": "CHANGE_BEHAVIOR_ONLY_NOT_CLEAN_GOLD",
+      "source_revision": "f36ef6fe1d735aca4c033303c067db037d4aaf22"
+    }
+  ]
+}

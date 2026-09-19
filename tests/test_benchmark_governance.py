@@ -20,6 +20,9 @@ from evoagent.benchmark_governance import (
     build_run_manifest,
     case_qualifies_for_primary_gold,
     compare_annotation_labels,
+    normalize_taxonomy,
+    validate_sampling_admission,
+    instrument_annotation_trace,
     expand_repository_sample,
     finding_qualifies_for_primary_gold,
     repository_cluster_paired_bootstrap,
@@ -110,6 +113,8 @@ def benchmark_case(
     case_id="case-1", repository="repo-1", split="validation",
     findings=None, status="ADJUDICATED", protocol_dry_run=False,
 ):
+    if protocol_dry_run:
+        split = "protocol_dry_run"
     values = [finding()] if findings is None else findings
     commentable = any(
         item["issue_exists"] and item["should_comment"]
@@ -124,6 +129,7 @@ def benchmark_case(
         "diff_sha256": hashlib.sha256(DIFF.encode()).hexdigest(),
         "captured_at": "2026-09-19T00:00:00Z", "split": split,
         "protocol_dry_run": protocol_dry_run, "related_cases": [], "diff": DIFF,
+        "final_claim_eligible": False,
         "annotators": [annotator("annotator-a", "run-a"), annotator("annotator-b", "run-b")],
         "findings": values, "case_annotation_status": status,
         "reviewer_records": [{
@@ -156,6 +162,18 @@ class BenchmarkSchemaTests(unittest.TestCase):
         case = benchmark_case()
         case["source"]["kind"] = "synthetic-controlled"
         with self.assertRaisesRegex(BenchmarkValidationError, "provenance"):
+            validate_benchmark_case(case)
+
+    def test_protocol_dry_run_requires_non_claim_split(self):
+        case = benchmark_case(protocol_dry_run=True)
+        case["final_claim_eligible"] = False
+        self.assertEqual("protocol_dry_run", validate_benchmark_case(case)["split"])
+
+        case["final_claim_eligible"] = True
+        with self.assertRaisesRegex(BenchmarkValidationError, "final_claim_eligible=false"):
+            validate_benchmark_case(case)
+        case["split"] = "validation"
+        with self.assertRaisesRegex(BenchmarkValidationError, "same non-claim dataset"):
             validate_benchmark_case(case)
 
     def test_clean_case_requires_explicit_completed_audit(self):
@@ -220,6 +238,7 @@ class BenchmarkSchemaTests(unittest.TestCase):
             "evidence_kind": "regression-test", "source_revision": "b" * 40,
             "evidence_refs": ["tests/test_app.py::test_danger"],
             "rationale": "The deterministic regression test isolates this finding.",
+            "scope": ["FINDING_EXISTENCE", "FINDING_BEHAVIOR"],
         }]
         normalized = validate_benchmark_case(case)
         self.assertTrue(case_qualifies_for_primary_gold(normalized))
@@ -229,6 +248,71 @@ class BenchmarkSchemaTests(unittest.TestCase):
         case["findings"][0]["reviewer_labels"][0]["evidence_refs"] = []
         with self.assertRaisesRegex(BenchmarkValidationError, "positive MODEL"):
             validate_benchmark_case(case)
+
+    def test_taxonomy_normalization_is_bounded_and_preserves_raw_values(self):
+        cwe = normalize_taxonomy("cwe22", "Directory Traversal")
+        self.assertEqual("CWE-22", cwe["canonical_identity"])
+        self.assertEqual("cwe22", cwe["raw_cwe"])
+        left = {"issue_exists": True, "logical_issue_id": "x", "category": "error handling regression", "path": "a.py", "start_line": 1, "end_line": 1, "severity": "low", "should_comment": True}
+        right = dict(left, category="error-handling")
+        self.assertTrue(compare_annotation_labels(left, right)["taxonomy"])
+        right["category"] = "authorization-bypass"
+        self.assertFalse(compare_annotation_labels(left, right)["taxonomy"])
+        left["cwe"] = "CWE22"
+        right["cwe"] = "CWE-79"
+        self.assertFalse(compare_annotation_labels(left, right)["taxonomy"])
+
+    def test_objective_scope_does_not_promote_regression_test_to_clean_case(self):
+        case = benchmark_case(findings=[])
+        case["annotators"] = [annotator("objective", "objective-run", "OBJECTIVE_EVIDENCE", "OBJECTIVE_EVIDENCE")]
+        case["reviewer_records"] = [{"annotator_id": "objective", "completed_review": True, "duration_seconds": 0, "submitted_at": "2026-09-19T00:00:00Z"}]
+        case["clean_review"]["gold_evidence_level"] = "OBJECTIVE"
+        case["clean_review"]["objective_evidence"] = [{
+            "evidence_kind": "regression-test", "source_revision": "b" * 40,
+            "evidence_refs": ["tests/test_app.py::test_fix"], "rationale": "Supports the fixed behavior only.",
+            "scope": ["FINDING_BEHAVIOR"],
+        }]
+        with self.assertRaisesRegex(BenchmarkValidationError, "WHOLE_CASE_CLEAN"):
+            validate_benchmark_case(case)
+        case["clean_review"]["objective_evidence"][0]["scope"] = ["WHOLE_CASE_CLEAN"]
+        with self.assertRaisesRegex(BenchmarkValidationError, "cannot prove WHOLE_CASE_CLEAN"):
+            validate_benchmark_case(case)
+        case["clean_review"]["objective_evidence"][0]["scope"] = "WHOLE_CASE_CLEAN"
+        with self.assertRaisesRegex(BenchmarkValidationError, "scope"):
+            validate_benchmark_case(case)
+        case["clean_review"]["objective_evidence"][0]["scope"] = ["WHOLE_CASE_CLEAN"]
+        case["clean_review"]["objective_evidence"][0]["evidence_kind"] = "exhaustive-static-enumeration"
+        case["clean_review"]["objective_evidence"][0]["coverage_rationale"] = "All states in a finite interface were enumerated."
+        self.assertTrue(case_qualifies_for_primary_gold(validate_benchmark_case(case)))
+
+    def test_sampling_category_is_verified_after_capture_without_prediction(self):
+        captured = {"case_id": "case-1", "diff_sha256": "d" * 64}
+        admission = {
+            "case_id": "case-1", "requested_sampling_category": "security-fix",
+            "verified_sampling_category": "maintenance-clean",
+            "verification_rationale": "Frozen diff only removes an obsolete guard.",
+            "evidence_refs": ["diff.patch:1-20"], "captured_diff_sha256": "d" * 64,
+            "evoagent_prediction_visible": False, "decision": "ADMIT",
+        }
+        normalized = validate_sampling_admission(admission, captured)
+        self.assertEqual("maintenance-clean", normalized["verified_sampling_category"])
+        admission["evoagent_prediction_visible"] = True
+        with self.assertRaisesRegex(BenchmarkValidationError, "blind"):
+            validate_sampling_admission(admission, captured)
+
+    def test_annotation_cost_instrumentation_counts_reads_without_fake_tokens(self):
+        events = [
+            {"type": "item.completed", "item": {"type": "command_execution", "command": "sed -n '1,20p' src/a.py", "aggregated_output": "abc"}},
+            {"type": "item.completed", "item": {"type": "command_execution", "command": "rg needle src/a.py src/b.py", "aggregated_output": "defg"}},
+            {"type": "turn.completed", "usage": {"input_tokens": 100, "output_tokens": 5}},
+        ]
+        measured = instrument_annotation_trace(events, ["src/a.py", "src/b.py"])
+        self.assertEqual(2, measured["unique_files_inspected"])
+        self.assertEqual(2, measured["repository_read_search_tool_calls"])
+        self.assertEqual(1, measured["repeat_file_reads"])
+        self.assertEqual(7, measured["tool_result_chars"])
+        self.assertIsNone(measured["tool_result_token_volume"])
+        self.assertIsNone(measured["input_token_breakdown"]["repository_tool_observations"])
 
     def test_non_commentable_technical_issue_is_not_false_negative(self):
         case = benchmark_case(findings=[finding(should_comment=False)])
@@ -401,11 +485,15 @@ class AttributionGoldTests(unittest.TestCase):
             "evidence_refs": [{"checkpoint": "lead-final"}],
             "rationale": "The trace establishes the observable layer.",
             "supports_fields": ["observable_failure_layer"],
+            "scope": ["OBSERVABLE_FAILURE_LAYER"],
         }]
         with self.assertRaisesRegex(BenchmarkValidationError, "layer and evolution route"):
             validate_attribution_gold(gold)
         gold["objective_evidence"][0]["supports_fields"] = [
             "observable_failure_layer", "status", "supported_surface", "target_skill",
+        ]
+        gold["objective_evidence"][0]["scope"] = [
+            "OBSERVABLE_FAILURE_LAYER", "EVOLUTION_ROUTE",
         ]
         normalized = validate_attribution_gold(gold)
         self.assertTrue(attribution_qualifies_for_primary_gold(normalized))

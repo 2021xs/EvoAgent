@@ -1,0 +1,32 @@
+{
+  "annotator_id": "requests-6963-adjudicator",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": true,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-18T18:35:35.765258Z",
+  "context_policy_hash": "183f87b1b3282d80610b75e5151e289271df24f9b77b8ab000c9beca8a8f8702",
+  "context_policy_id": "frozen-repository-plus-a-b-evidence-v1",
+  "execution": {
+    "exit_code": 0,
+    "input_tokens": 121590,
+    "output_tokens": 1531,
+    "stderr": "Reading additional input from stdin...\n2026-09-18T18:34:46.865090Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:34:46.866551Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:34:46.868098Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:34:46.869306Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:34:46.870310Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:34:46.870983Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-18T18:35:06.199235Z  WARN codex_sandboxing::violation: recorded sandbox violation: resource=filesystem backend=seatbelt reason=operation_not_permitted path=unknown\n",
+    "tool_calls": 3,
+    "wall_clock_seconds": 48.942
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "5c9fd9ee13b8fcdde2a948d56e2120254c9a11908e6baebda68f402434de51d0",
+  "prompt_version": "evidence-adjudication-guide-v1",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "ADJUDICATOR",
+  "run_id": "1a1ea995-9a28-461e-80e1-9528e2bf1b11",
+  "started_at": "2026-09-18T18:34:46.822926Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

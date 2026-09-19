@@ -1,0 +1,25 @@
+{
+  "ambiguity_rate": 0.0,
+  "ambiguous_count": 0,
+  "final_claim_eligible": false,
+  "note": "Structural audit using frozen annotator outputs after gold freeze; not an EvoAgent performance measurement.",
+  "protocol_dry_run": true,
+  "records": [
+    {
+      "case_id": "requests-6963",
+      "decision": "DEFINITE_NO_MATCH",
+      "reason": "adjudicated gold contains no finding",
+      "source": "annotator-B"
+    },
+    {
+      "case_id": "httpx-3690",
+      "decision": "DEFINITE_MATCH",
+      "source": "annotator-A"
+    },
+    {
+      "case_id": "httpx-3690",
+      "decision": "DEFINITE_MATCH",
+      "source": "annotator-B"
+    }
+  ]
+}

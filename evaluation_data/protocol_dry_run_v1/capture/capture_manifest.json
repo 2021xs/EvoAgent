@@ -1,0 +1,504 @@
+{
+  "case_count": 8,
+  "cases": [
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "lkk7",
+      "base_sha": "514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b",
+      "base_snapshot_commit": "f9cedde6654a9f0e869fd92f952986fd91eee552",
+      "base_snapshot_ref": "refs/snapshots/flask-6096/base",
+      "base_tree_sha": "c7ec5b743fd39ea74136f6504ddd65787c8a5eec",
+      "body": "Fix two usages of `.partition(\":\")` on potential IPv6 addresses.\r\nReplace them with alternatives.\r\n\r\nFixes https://github.com/pallets/flask/issues/6093\r\n\r\n<!--\r\nEnsure each step in CONTRIBUTING.rst is complete, especially the following:\r\n- Add tests that demonstrate the correct behavior of the change. Tests\r\n  should fail without the change.\r\n- Add or update relevant docs, in the docs folder and in code.\r\n- Add an entry in CHANGES.rst summarizing the change and linking to the issue.\r\n- Add `.. versionchanged::` entries in any relevant code docs.\r\n-->\r\n",
+      "captured_at": "2026-09-18T18:58:09.622082Z",
+      "case_id": "flask-6096",
+      "changed_files": [
+        {
+          "additions": 7,
+          "deletions": 4,
+          "path": "src/flask/app.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "src/flask/testing.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 0,
+          "path": "tests/test_basic.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 14,
+          "deletions": 0,
+          "path": "tests/test_testing.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "correctness-bug-fix",
+      "diff_sha256": "953270ffbfc4b312e23bebf58e1865e358734c917bd6f325d730ac1dd847c5ff",
+      "final_claim_eligible": false,
+      "head_sha": "7203feabf723edae0286ae5dc64fec8ac4c91735",
+      "head_snapshot_commit": "b106050e07769617b9ef225080f692f62d4fa77a",
+      "head_snapshot_ref": "refs/snapshots/flask-6096/head",
+      "head_tree_sha": "4eb11319bd4fe0d074eb1444513ff262a0679cac",
+      "license": {
+        "html_url": "https://github.com/pallets/flask/blob/514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b/LICENSE.txt",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "path": "LICENSE.txt",
+        "spdx_id": "BSD-3-Clause"
+      },
+      "merged_at": "2026-08-11T19:48:41Z",
+      "protocol_dry_run": true,
+      "pull_request": 6096,
+      "repository_id": "pallets/flask",
+      "sampling_rationale": "Small IPv6 parsing correction with regression tests.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "pallets/flask#6096",
+        "url": "https://github.com/pallets/flask/pull/6096"
+      },
+      "title": "Fix `.partition(\":\")` usage on potential IPv6 addresses"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "davidism",
+      "base_sha": "3596b1ab61cea85edb8970e83ff61daa073facf8",
+      "base_snapshot_commit": "42b4d02316da67a91d4c3ed6a17c758663da0c29",
+      "base_snapshot_ref": "refs/snapshots/flask-6133/base",
+      "base_tree_sha": "3a23fde1c1d5ce46748e9a28683232bb81c6e039",
+      "body": "[RFC 10008](https://datatracker.ietf.org/doc/html/rfc10008) isn't accepted yet, but it's been kicking around for years and looks like it will pass. I'm adding it now so I don't have to watch it anymore.\r\n\r\nAdded `client.query` method in https://github.com/pallets/werkzeug/pull/3219. Adjusted the test here to account for Werkzeug not being released yet.\r\n\r\ncloses #3193 ",
+      "captured_at": "2026-09-18T18:58:28.905317Z",
+      "case_id": "flask-6133",
+      "changed_files": [
+        {
+          "additions": 1,
+          "deletions": 0,
+          "path": "CHANGES.rst",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 8,
+          "deletions": 0,
+          "path": "src/flask/sansio/scaffold.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 5,
+          "deletions": 2,
+          "path": "tests/test_basic.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "feature",
+      "diff_sha256": "cce6fa42cebe64072396ba3a3fb9d47523648b694338f14c48dddab7abf28073",
+      "final_claim_eligible": false,
+      "head_sha": "89992954ec71b594b1b911f98977cdc8ad46a057",
+      "head_snapshot_commit": "2690073c2b560fa1dec644acd5da56f59edf41ce",
+      "head_snapshot_ref": "refs/snapshots/flask-6133/head",
+      "head_tree_sha": "7116532123a508df15a14e9830cc93d29667c018",
+      "license": {
+        "html_url": "https://github.com/pallets/flask/blob/3596b1ab61cea85edb8970e83ff61daa073facf8/LICENSE.txt",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "path": "LICENSE.txt",
+        "spdx_id": "BSD-3-Clause"
+      },
+      "merged_at": "2026-08-11T20:19:14Z",
+      "protocol_dry_run": true,
+      "pull_request": 6133,
+      "repository_id": "pallets/flask",
+      "sampling_rationale": "Small routing feature with framework-level behavior.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "pallets/flask#6133",
+        "url": "https://github.com/pallets/flask/pull/6133"
+      },
+      "title": "add `app.query` route decorator"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "awoimbee",
+      "base_sha": "7bc45877a86192af77645e156eb3744f95b47dae",
+      "base_snapshot_commit": "c50018a9c1ef302e19cda44895626697989501dd",
+      "base_snapshot_ref": "refs/snapshots/requests-6963/base",
+      "base_tree_sha": "a75eb40146d0cffe0581f2f18451cf8348f35a3e",
+      "body": "https://seclists.org/fulldisclosure/2025/Jun/2\r\n\r\nHonestly I have no idea why this lib used `netloc` + manual parsing instead of `hostname` as I can see references to `hostname` as early as from [the python 2.6 docs](https://docs.python.org/2.6/library/urlparse.html).",
+      "captured_at": "2026-09-18T18:58:39.214629Z",
+      "case_id": "requests-6963",
+      "changed_files": [
+        {
+          "additions": 1,
+          "deletions": 8,
+          "path": "src/requests/utils.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 19,
+          "deletions": 0,
+          "path": "tests/test_utils.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "security-sensitive-metadata-signal",
+      "diff_sha256": "ddeb9c422d9d75497a02b7f157f40158204b34c89db58f687b68c92ace94a343",
+      "final_claim_eligible": false,
+      "head_sha": "92bab7d1142db0c807060577233568e5f7734c9b",
+      "head_snapshot_commit": "83bd72303af4d6d249e77b6f90eb3c193e100f2b",
+      "head_snapshot_ref": "refs/snapshots/requests-6963/head",
+      "head_tree_sha": "597201c513423b9b7e745919e18a58f2ceb3c788",
+      "license": {
+        "html_url": "https://github.com/psf/requests/blob/7bc45877a86192af77645e156eb3744f95b47dae/LICENSE",
+        "name": "Apache License 2.0",
+        "path": "LICENSE",
+        "spdx_id": "Apache-2.0"
+      },
+      "merged_at": "2025-06-05T14:55:33Z",
+      "protocol_dry_run": true,
+      "pull_request": 6963,
+      "repository_id": "psf/requests",
+      "sampling_rationale": "Selected from the public PR title/body as security-sensitive; the later frozen-diff audit found that the captured base already contains the hostname parsing fix, so this case tests metadata-versus-source verification rather than a credential-fix diff.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "psf/requests#6963",
+        "url": "https://github.com/psf/requests/pull/6963"
+      },
+      "title": "fix CVE 2024 47081: manual url parsing leads to netloc credentials leak"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "dependabot[bot]",
+      "base_sha": "1c49660b84c88eeb2695796ce4a68903c00e00c5",
+      "base_snapshot_commit": "6bb8a5a32a0b3b54938cd1fb0c385306bd4a2c1b",
+      "base_snapshot_ref": "refs/snapshots/requests-7025/base",
+      "base_tree_sha": "3632ce45eebed1c9843fadd8a919fe05be149c67",
+      "body": "Bumps [pypa/gh-action-pypi-publish](https://github.com/pypa/gh-action-pypi-publish) from 1.12.4 to 1.13.0.\n<details>\n<summary>Release notes</summary>\n<p><em>Sourced from <a href=\"https://github.com/pypa/gh-action-pypi-publish/releases\">pypa/gh-action-pypi-publish's releases</a>.</em></p>\n<blockquote>\n<h2>v1.13.0</h2>\n<!-- raw HTML omitted -->\n<blockquote>\n<p>[!important]\n🚨 This release includes fixes for <a href=\"https://github.com/pypa/gh-action-pypi-publish/security/advisories/GHSA-vxmw-7h4f-hqxh\">GHSA-vxmw-7h4f-hqxh</a> discovered by <a href=\"https://github.com/woodruffw\"><code>@​woodruffw</code></a><a href=\"https://github.com/sponsors/woodruffw\">💰</a>.\nWe've also integrated <a href=\"http://zizmor.sh\">Zizmor</a> to catch similar issues in the future and you should too.</p>\n</blockquote>\n<h2>✨ New Stuff</h2>\n<p><a href=\"https://github.com/woodruffw\"><code>@​woodruffw</code></a><a href=\"https://github.com/sponsors/woodruffw\">💰</a> updated the README to no longer mention the attestations feature being experimental in <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/347\">#347</a>: it's been rather stable for a year already 🎉\nHe also added more diagnostic output which includes printing out the GitHub Environment claim via <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/371\">#371</a> and warning about the unsupported reusable workflows configurations <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/306\">#306</a>, when using Trusted Publishing.</p>\n<blockquote>\n<p>[!tip]\nThe official support for reusable workflows is currently blocked on changes to PyPI. To get updates about progress on the action side, you may want to subscribe to <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/166\">#166</a>.\nAt PyCon US 2025 Sprints, <a href=\"https://github.com/facutuesca\"><code>@​facutuesca</code></a><a href=\"https://github.com/sponsors/facutuesca\">💰</a>, <a href=\"https://github.com/miketheman\"><code>@​miketheman</code></a><a href=\"https://github.com/sponsors/miketheman\">💰</a>, <a href=\"https://github.com/woodruffw\"><code>@​woodruffw</code></a><a href=\"https://github.com/sponsors/woodruffw\">💰</a> and I<a href=\"https://github.com/sponsors/webknjaz\">💰</a> spent several hours IRL brainstorming how to fix this and migrate projects that happen to rely on an obscure corner case with reusable workflows that temporarily allows them to function by accident.\nThe result of that discussion is posted @ <a href=\"https://redirect.github.com/pypi/warehouse/issues/11096#issuecomment-2895081700\">pypi/warehouse#11096</a>.\nNote that this is a volunteer-led effort and there is no ETA. If you need this soon, make your employer sponsor the PSF and maybe they'll be able to hire somebody for this work on Warehouse.</p>\n</blockquote>\n<p>In addition to that, <a href=\"https://github.com/konstin\"><code>@​konstin</code></a><a href=\"https://github.com/sponsors/konstin\">💰</a> sent <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/378\">#378</a> to pin <code>actions/setup-python</code> to a SHA hash. This makes <code>pypi-publish</code> compatible with new GitHub policies that allow organizations to mandate hash-pinning actions used in workflows.</p>\n<h2>🛠️ Internal Dependencies</h2>\n<p><a href=\"https://github.com/webknjaz\"><code>@​webknjaz</code></a><a href=\"https://github.com/sponsors/webknjaz\">💰</a> made a bunch of updates to the action runtime which includes bumping it to Python 3.13 in <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/331\">#331</a> and updating the dependency tree across the board. <code>pip-with-requires-python</code> is no longer being installed (<a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/332\">#332</a>). Some related bumps were contributed by <a href=\"https://github.com/woodruffw\"><code>@​woodruffw</code></a><a href=\"https://github.com/sponsors/woodruffw\">💰</a> (<a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/359\">#359</a>) and <a href=\"https://github.com/kurtmckee\"><code>@​kurtmckee</code></a><a href=\"https://github.com/sponsors/kurtmckee\">💰</a> sent a contributor-facing PR, bumping the linting configuration via <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/335\">#335</a>.</p>\n<h2>💪 New Contributors</h2>\n<ul>\n<li><a href=\"https://github.com/kurtmckee\"><code>@​kurtmckee</code></a> made their first contribution in <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/335\">#335</a></li>\n<li><a href=\"https://github.com/konstin\"><code>@​konstin</code></a> made their first contribution in <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/378\">#378</a></li>\n</ul>\n<p><strong>🪞 Full Diff</strong>: <a href=\"https://github.com/pypa/gh-action-pypi-publish/compare/v1.12.4...v1.13.0\">https://github.com/pypa/gh-action-pypi-publish/compare/v1.12.4...v1.13.0</a></p>\n<p><strong>🧔‍♂️ Release Manager:</strong> <a href=\"https://github.com/sponsors/webknjaz\"><code>@​webknjaz</code></a> <a href=\"https://stand-with-ukraine.pp.ua\">🇺🇦</a></p>\n<p><strong>💬 Discuss</strong> <a href=\"https://bsky.app/profile/webknjaz.me/post/3lxxzvzhvfc2e\">on Bluesky 🦋</a>, <a href=\"https://mastodon.social/@webknjaz/115143522527224444\">on Mastodon 🐘</a> and <a href=\"https://github.com/pypa/gh-action-pypi-publish/discussions/379\">on GitHub</a>.</p>\n<p><a href=\"https://github.com/sponsors/webknjaz\"><img src=\"https://img.shields.io/badge/%40webknjaz-transparent?logo=githubsponsors&amp;logoColor=%23EA4AAA&amp;label=Sponsor&amp;color=2a313c\" alt=\"GH Sponsors badge\" /></a></p>\n</blockquote>\n</details>\n<details>\n<summary>Commits</summary>\n<ul>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e\"><code>ed0c539</code></a> 📦📌 Bump the pinned dependency tree</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/77db1b7cf7dcea2e403bb4350516284282740dd6\"><code>77db1b7</code></a> Merge branch PR <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/306\">#306</a>, GHSA-vxmw-7h4f-hqxh fix and PR <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/378\">#378</a> into unstable/v1</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/280b3a1b7e38a360b85b4ee41645d27b79bde3fc\"><code>280b3a1</code></a> Alias <code>typing as t</code> in imports</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/e380240d7e3673f460e0621686f33fbbf9594e85\"><code>e380240</code></a> Use <code>object</code> in place of <code>typing.Any</code> in annotations</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/e50bff6eb477e46de0cbacc0693737ecb690eb0f\"><code>e50bff6</code></a> Deduplicate claim ref lookup</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/decbc9a5d448364aa64c211724dc79a2cefcab2a\"><code>decbc9a</code></a> Hint people to subscribe to <a href=\"https://redirect.github.com/pypa/gh-action-pypi-publish/issues/166\">#166</a> for notifications</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/8208ad36a18e6fdd644f6ad69dc70c833d8af633\"><code>8208ad3</code></a> Ask not to report bugs with reusable workflow</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/ff0fef5bdb66aa250f741d5d8b00a8b78b9dffd5\"><code>ff0fef5</code></a> 🧪 Scope WPS202 suppression to specific files</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/1293b8c325b5f9abcab5160ee3553de2ee6a883f\"><code>1293b8c</code></a> Use yamllint disable line length lint</li>\n<li><a href=\"https://github.com/pypa/gh-action-pypi-publish/commit/ed01280d14b6f9a0edaa1a5494d8f7ffed709083\"><code>ed01280</code></a> Linter (different rule)</li>\n<li>Additional commits viewable in <a href=\"https://github.com/pypa/gh-action-pypi-publish/compare/76f52bc884231f62b9a034ebfe128415bbaabdfc...ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e\">compare view</a></li>\n</ul>\n</details>\n<br />\n\n\n[![Dependabot compatibility score](https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=pypa/gh-action-pypi-publish&package-manager=github_actions&previous-version=1.12.4&new-version=1.13.0)](https://docs.github.com/en/github/managing-security-vulnerabilities/about-dependabot-security-updates#about-compatibility-scores)\n\nDependabot will resolve any conflicts with this PR as long as you don't alter it yourself. You can also trigger a rebase manually by commenting `@dependabot rebase`.\n\n[//]: # (dependabot-automerge-start)\n[//]: # (dependabot-automerge-end)\n\n---\n\n<details>\n<summary>Dependabot commands and options</summary>\n<br />\n\nYou can trigger Dependabot actions by commenting on this PR:\n- `@dependabot rebase` will rebase this PR\n- `@dependabot recreate` will recreate this PR, overwriting any edits that have been made to it\n- `@dependabot merge` will merge this PR after your CI passes on it\n- `@dependabot squash and merge` will squash and merge this PR after your CI passes on it\n- `@dependabot cancel merge` will cancel a previously requested merge and block automerging\n- `@dependabot reopen` will reopen this PR if it is closed\n- `@dependabot close` will close this PR and stop Dependabot recreating it. You can achieve the same result by closing it manually\n- `@dependabot show <dependency name> ignore conditions` will show all of the ignore conditions of the specified dependency\n- `@dependabot ignore this major version` will close this PR and stop Dependabot creating any more for this major version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this minor version` will close this PR and stop Dependabot creating any more for this minor version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this dependency` will close this PR and stop Dependabot creating any more for this dependency (unless you reopen the PR or upgrade to it yourself)\n\n\n</details>",
+      "captured_at": "2026-09-18T18:58:57.183868Z",
+      "case_id": "requests-7025",
+      "changed_files": [
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": ".github/workflows/publish.yml",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "test-config-infrastructure",
+      "diff_sha256": "143ae74eea36a88105748dce5a0b18a1d2eff9db9e21c24d4348aea41eb739ff",
+      "final_claim_eligible": false,
+      "head_sha": "7d8df1df573a01f20a80994685e9f6c375f9c63f",
+      "head_snapshot_commit": "3268384a600edfd0eac8e94d066f22ccd4594811",
+      "head_snapshot_ref": "refs/snapshots/requests-7025/head",
+      "head_tree_sha": "a144e84f2ca88514f71571a9c71e456ac547732b",
+      "license": {
+        "html_url": "https://github.com/psf/requests/blob/1c49660b84c88eeb2695796ce4a68903c00e00c5/LICENSE",
+        "name": "Apache License 2.0",
+        "path": "LICENSE",
+        "spdx_id": "Apache-2.0"
+      },
+      "merged_at": "2025-09-09T00:08:50Z",
+      "protocol_dry_run": true,
+      "pull_request": 7025,
+      "repository_id": "psf/requests",
+      "sampling_rationale": "One-line pinned GitHub Action dependency update; likely-clean control candidate.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "psf/requests#7025",
+        "url": "https://github.com/psf/requests/pull/7025"
+      },
+      "title": "Bump pypa/gh-action-pypi-publish from 1.12.4 to 1.13.0"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "lovelydinosaur",
+      "base_sha": "20380490fd0bd13c68704080754c1385bff96d69",
+      "base_snapshot_commit": "ac2a66f66b742cd3d46f018ccf208aaae7fc011d",
+      "base_snapshot_ref": "refs/snapshots/httpx-3690/base",
+      "base_tree_sha": "b052734911221ac009610387dfb77a130b6c8578",
+      "body": "Add `.wait_ready()` to `HTTPParser`...\r\n\r\nWe need this in order to differentiate between clean disconnects at the start of a new request/response cycle, rather than a `ProtocolError` while calling `recv_method_line()`.\r\n",
+      "captured_at": "2026-09-18T18:59:03.634232Z",
+      "case_id": "httpx-3690",
+      "changed_files": [
+        {
+          "additions": 16,
+          "deletions": 0,
+          "path": "src/ahttpx/_parsers.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 9,
+          "deletions": 1,
+          "path": "src/ahttpx/_server.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 16,
+          "deletions": 0,
+          "path": "src/httpx/_parsers.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 10,
+          "deletions": 5,
+          "path": "src/httpx/_server.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "correctness-feature",
+      "diff_sha256": "2305c7d114891be70399406e15b74e5c80b6b3ad249bb387ed1f077d67ee4085",
+      "final_claim_eligible": false,
+      "head_sha": "350221558d4f079fc4ab3673d81a4bc730fbb9c3",
+      "head_snapshot_commit": "1796222071e9a615f7950f3b37cf2dcaf3bcf187",
+      "head_snapshot_ref": "refs/snapshots/httpx-3690/head",
+      "head_tree_sha": "690fac63c01216fa112cfa1e5b7fc770f8b26ad2",
+      "license": {
+        "html_url": "https://api.github.com/licenses/bsd-3-clause",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "note": "Repository-level GitHub license metadata; no license file detected at frozen base revision.",
+        "path": null,
+        "spdx_id": "BSD-3-Clause"
+      },
+      "merged_at": "2025-10-13T14:00:49Z",
+      "protocol_dry_run": true,
+      "pull_request": 3690,
+      "repository_id": "encode/httpx",
+      "sampling_rationale": "Protocol disconnect handling change with tests.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "encode/httpx#3690",
+        "url": "https://github.com/encode/httpx/pull/3690"
+      },
+      "title": "Add `.wait_ready` to parser for clean server disconnects"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "JRaspass",
+      "base_sha": "77074b34b9396eed9faf73c2a484c775356b33ba",
+      "base_snapshot_commit": "866deba480b04b1874fa9cf1fca44d1c4a3136ba",
+      "base_snapshot_ref": "refs/snapshots/chi-1167/base",
+      "base_tree_sha": "968734836ad2ab41a5bc281c353ae63bf0f62f0c",
+      "body": "Purely a style change but represents the bulk of the noise that come up when running `go fix ./...` so it would be nice to fix them :-P",
+      "captured_at": "2026-09-18T18:59:11.557148Z",
+      "case_id": "chi-1167",
+      "changed_files": [
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "middleware/compress.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 5,
+          "deletions": 5,
+          "path": "middleware/logger.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "middleware/middleware_test.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 3,
+          "deletions": 3,
+          "path": "middleware/recoverer.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "middleware/recoverer_test.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "middleware/terminal.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "middleware/value.go",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "mux.go",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "refactor",
+      "diff_sha256": "dde7d9d02a46884f48ff4d7c3a4a40ba71f12df173682a41b1ca0ff5fe59c5a2",
+      "final_claim_eligible": false,
+      "head_sha": "4af82b0226f4e63d58f10d149fbf2374d2140923",
+      "head_snapshot_commit": "05753772c0fa021ada0c6905e14081305a69c986",
+      "head_snapshot_ref": "refs/snapshots/chi-1167/head",
+      "head_tree_sha": "505eded250a8640c1ac344b566208aefaa86548f",
+      "license": {
+        "html_url": "https://github.com/go-chi/chi/blob/77074b34b9396eed9faf73c2a484c775356b33ba/LICENSE",
+        "name": "MIT License",
+        "path": "LICENSE",
+        "spdx_id": "MIT"
+      },
+      "merged_at": "2026-08-31T10:52:55Z",
+      "protocol_dry_run": true,
+      "pull_request": 1167,
+      "repository_id": "go-chi/chi",
+      "sampling_rationale": "Mechanical Go type-alias modernization across multiple files.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "go-chi/chi#1167",
+        "url": "https://github.com/go-chi/chi/pull/1167"
+      },
+      "title": "Replace \"interface{}\" with \"any\""
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "barveP",
+      "base_sha": "99ab2acccff15f757260a1e1fbb0d2a47fc01041",
+      "base_snapshot_commit": "37a97d0bc1787f1b451375c1a3669b85042e9027",
+      "base_snapshot_ref": "refs/snapshots/pytest-15044/base",
+      "base_tree_sha": "b582446d2cef9441abf954e7d04fb6fdcde9edc6",
+      "body": "Fixes #15043.\n\n`cache.set()` already warns when opening a cache file fails, but an `OSError` from writing or closing it currently escapes. Move the existing write into the same error handler so these failures also produce `PytestCacheWarning`.\n\nThe regression test covers open, write, and close failures. The write and close cases fail before the fix; all three pass afterward. A separate reproduction using a real file-size limit also fails on pytest 9.1.1 and unmodified main, then produces warnings with this fix.\n\nChecks on macOS:\n\n- Full Python 3.13 suite, `tox -e py313 -- -q`: 4,607 passed, 51 skipped, 15 xfailed, 5 xpassed.\n- Cache tests on Python 3.12 and 3.13: 68 passed on each.\n- `tox -e linting`: passed.\n\nJSON serialization and warning filters keep their existing behavior.\n\nCo-developed by Poorva Barve and Codex.\n",
+      "captured_at": "2026-09-18T18:59:18.394035Z",
+      "case_id": "pytest-15044",
+      "changed_files": [
+        {
+          "additions": 1,
+          "deletions": 0,
+          "path": "AUTHORS",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 0,
+          "path": "changelog/15043.bugfix.rst",
+          "previous_filename": null,
+          "status": "added"
+        },
+        {
+          "additions": 1,
+          "deletions": 4,
+          "path": "src/_pytest/cacheprovider.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 26,
+          "deletions": 0,
+          "path": "testing/test_cacheprovider.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "correctness-error-handling",
+      "diff_sha256": "4aedd6b4ece27ae5b32b32daa5d7b263d3e162817bdbc5a4f2cb12ff8860083b",
+      "final_claim_eligible": false,
+      "head_sha": "f36ef6fe1d735aca4c033303c067db037d4aaf22",
+      "head_snapshot_commit": "25b50abc9f0b009a6627caca1a7fe3a687252e8b",
+      "head_snapshot_ref": "refs/snapshots/pytest-15044/head",
+      "head_tree_sha": "e60ecbad01d30c93a6ef0d74a03a7b2fff9d6bcd",
+      "license": {
+        "html_url": "https://github.com/pytest-dev/pytest/blob/99ab2acccff15f757260a1e1fbb0d2a47fc01041/LICENSE",
+        "name": "MIT License",
+        "path": "LICENSE",
+        "spdx_id": "MIT"
+      },
+      "merged_at": "2026-09-18T06:25:34Z",
+      "protocol_dry_run": true,
+      "pull_request": 15044,
+      "repository_id": "pytest-dev/pytest",
+      "sampling_rationale": "Cache write/close failure handling with regression coverage.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "pytest-dev/pytest#15044",
+        "url": "https://github.com/pytest-dev/pytest/pull/15044"
+      },
+      "title": "Warn when writing or closing a cache file fails"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v1",
+      "author": "bluetech",
+      "base_sha": "56a92c19d4a71152c594726efc9deb5f0e126e99",
+      "base_snapshot_commit": "544978baccf98ffcfc83fdf521febe697b0fd805",
+      "base_snapshot_ref": "refs/snapshots/pytest-15057/base",
+      "base_tree_sha": "954144c42e7151e50436939bc45bab4a87643620",
+      "body": "This was added in 44ecf2ab2f64868de086fddf43373ba3f7805d11 as part of a feature that has since been reverted in 707b6b5e3fee6626c9ea9496b41f42077895864c.\r\n\r\nThe branch is not covered by the test suite, let's just remove this code.",
+      "captured_at": "2026-09-18T18:59:26.891512Z",
+      "case_id": "pytest-15057",
+      "changed_files": [
+        {
+          "additions": 0,
+          "deletions": 5,
+          "path": "src/_pytest/fixtures.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "likely-clean-small-change",
+      "diff_sha256": "dc9289a37d2d273b7a8c48a18a5dc6aee483c1b1b8510d9aa0164ef403070cf0",
+      "final_claim_eligible": false,
+      "head_sha": "2ba72a3a5e79e14ae477009987710f24060e69a1",
+      "head_snapshot_commit": "30236615d490b8d1ccbfdcb7e9993eb9526d5b2f",
+      "head_snapshot_ref": "refs/snapshots/pytest-15057/head",
+      "head_tree_sha": "3d1e3b375087e2729a2dcead9f615b66c9a9650c",
+      "license": {
+        "html_url": "https://github.com/pytest-dev/pytest/blob/56a92c19d4a71152c594726efc9deb5f0e126e99/LICENSE",
+        "name": "MIT License",
+        "path": "LICENSE",
+        "spdx_id": "MIT"
+      },
+      "merged_at": "2026-09-17T15:54:25Z",
+      "protocol_dry_run": true,
+      "pull_request": 15057,
+      "repository_id": "pytest-dev/pytest",
+      "sampling_rationale": "Small dead-code removal explicitly described as uncovered legacy cleanup.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "pytest-dev/pytest#15057",
+        "url": "https://github.com/pytest-dev/pytest/pull/15057"
+      },
+      "title": "fixtures: remove dead dedupe code in `--fixtures` implementation"
+    }
+  ],
+  "dataset_id": "evoagent-evidence-adjudicated-pr-protocol-dry-run",
+  "dataset_version": "0.1.0-protocol-dry-run",
+  "final_claim_eligible": false,
+  "protocol_dry_run": true,
+  "repository_count": 5
+}

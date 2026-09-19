@@ -1,0 +1,63 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v2",
+  "author": "yassinbahri",
+  "base_identity_method": "github-compare-merge-base",
+  "base_sha": "0751d5fed159fd9ff7edba522ece13c8c9d2a0d0",
+  "base_snapshot_commit": "91c1197b2d3b9d0bb3e0fbbc1a38c2fece3786a6",
+  "base_snapshot_ref": "refs/snapshots/django-21867/base",
+  "base_tree_sha": "9128bbe6cfe038632a0a767393b8ad61ff51a519",
+  "body": "#### Trac ticket number\n<!-- Replace XXXXX with the corresponding Trac ticket number. -->\n<!-- Or delete the line and write \"N/A - typo\" for typo fixes. -->\n\nticket-37312\n\n#### Branch description\n`QuerySet.in_bulk()` rebuilt `values()` and `values_list()` projections from `query.values_select` when the mapping key field wasn't selected. This omitted selected annotation and extra-select aliases stored in `query.selected`. The patch rebuilds from the complete selected projection and adds regression coverage for every affected iterable form.\n\n#### AI Assistance Disclosure (REQUIRED)\n<!-- Select exactly ONE of the following: -->\n- [ ] **No AI tools were used** in preparing this PR.\n- [x] **If AI tools were used**, I have disclosed which ones, and fully reviewed and verified their output.\n<!-- If AI tools were used, provide which tools were used here. -->\n\nI used OpenAI Codex to help investigate, implement, and test the patch. I manually reviewed all changes and verified them with Django's relevant test suite and pre-commit checks.\n\n#### Checklist\n- [x] This PR follows the [contribution guidelines](https://docs.djangoproject.com/en/stable/internals/contributing/writing-code/submitting-patches/).\n- [x] This PR **does not** disclose a security vulnerability (see [vulnerability reporting](https://docs.djangoproject.com/en/stable/internals/security/)).\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\n- [x] The commit message is written in past tense, mentions the ticket number (if applicable), and ends with a period (see [guidelines](https://docs.djangoproject.com/en/dev/internals/contributing/committing-code/#committing-guidelines)).\n- [x] I have not requested, and will not request, an automated AI review for this PR. <!-- You are welcome to do so in your own fork. -->\n\n<!-- Leave the following items unchecked if not applicable. -->\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\n- [x] I have added or updated relevant tests.\n- [x] I have added or updated relevant docs, including release notes if applicable.\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.",
+  "captured_at": "2026-09-19T02:16:44.079475Z",
+  "case_id": "django-21867",
+  "changed_files": [
+    {
+      "additions": 14,
+      "deletions": 5,
+      "path": "django/db/models/query.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 4,
+      "deletions": 0,
+      "path": "docs/releases/6.1.1.txt",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 88,
+      "deletions": 0,
+      "path": "tests/lookup/tests.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "cross-file-root-cause-symptom",
+  "diff_sha256": "0c6bd4cf26582425929b7ea6864e291aa2b4369d99a98392d1af6718fa93dd5f",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "head_sha": "be010d8220d9100a8b87122eddc586c8c9bc44f0",
+  "head_snapshot_commit": "97a180a6982d6c6a45d66906283e761065466337",
+  "head_snapshot_ref": "refs/snapshots/django-21867/head",
+  "head_tree_sha": "11f46470d0e47eb1619b94b1ac3fc8194a30dceb",
+  "license": {
+    "html_url": "https://github.com/django/django/blob/05aec0a4aa111b54b50daec64059fd18ac70b437/LICENSE",
+    "name": "Other",
+    "path": "LICENSE",
+    "spdx_id": "NOASSERTION"
+  },
+  "merged_at": "2026-09-02T15:23:15Z",
+  "protocol_dry_run": true,
+  "pull_request": 21867,
+  "repository_base_tip_sha_at_capture": "05aec0a4aa111b54b50daec64059fd18ac70b437",
+  "repository_id": "django/django",
+  "requested_sampling_category": "cross-file-root-cause-symptom",
+  "sampling_rationale": "ORM implementation and regression tests exercise root-cause versus observed-query symptom descriptions.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "django/django#21867",
+    "url": "https://github.com/django/django/pull/21867"
+  },
+  "title": "Fixed #37312, Refs #36605 -- Fixed annotation preservation and key selection in in_bulk()."
+}

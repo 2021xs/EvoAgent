@@ -1,0 +1,410 @@
+{
+  "case_count": 6,
+  "cases": [
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "adamchainz",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+      "base_snapshot_commit": "0eee053ba3d3eba547e391aa36bd96c30a06c824",
+      "base_snapshot_ref": "refs/snapshots/django-21754/base",
+      "base_tree_sha": "0ffa0d786a1d2d62bb67a4697537b4942eaf53a0",
+      "body": "#### Trac ticket number\r\n\r\nticket-37263\r\n\r\n#### Branch description\r\n\r\nSearch terms for non-text `__exact` `search_fields` entries were validated with the model field's `formfield().to_python()`, which failed to reject invalid terms for two kinds of fields:\r\n\r\n- Fields with choices use `TypedChoiceField`, whose `to_python()` returns the raw string unvalidated, so any non-matching search term (e.g. `\"john\"` against an `IntegerField` with `choices`) reached the ORM and crashed the changelist with a `ValueError` (HTTP 500).\r\n\r\n- `BooleanField` uses `forms.BooleanField`, whose `to_python()` maps almost any string to `True`, so an arbitrary search term OR-matched every row with a `True` value instead of matching nothing.\r\n\r\nBoolean search terms are now parsed strictly with\r\n`forms.NullBooleanField` (so `\"true\"`/`\"false\"`/`\"1\"`/`\"0\"` still match, while other terms are skipped), string values that a form field returns unconverted are checked against the model field's `to_python()`, and `ChangeList.get_queryset()` converts remaining value errors raised while building search results into `IncorrectLookupParameters` instead of letting them bubble up as a server error.\r\n\r\nRegression in 4cecf3039586ea738afafb9a28c946bff42c37c1.\r\n\r\n#### AI Assistance Disclosure (REQUIRED)\r\n<!-- Select exactly ONE of the following: -->\r\n- [ ] **No AI tools were used** in preparing this PR.\r\n- [x] **If AI tools were used**, I have disclosed which ones, and fully reviewed and verified their output.\r\n<!-- If AI tools were used, provide which tools were used here. -->\r\n\r\nClaude 5 Fable did nearly all the work here, discovering the bug and writing the commit. I made minor edits. I agree with the report and approach.\r\n\r\n#### Checklist\r\n- [x] This PR follows the [contribution guidelines](https://docs.djangoproject.com/en/stable/internals/contributing/writing-code/submitting-patches/).\r\n- [x] This PR **does not** disclose a security vulnerability (see [vulnerability reporting](https://docs.djangoproject.com/en/stable/internals/security/)).\r\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [x] The commit message is written in past tense, mentions the ticket number (if applicable), and ends with a period (see [guidelines](https://docs.djangoproject.com/en/dev/internals/contributing/committing-code/#committing-guidelines)).\r\n- [x] I have not requested, and will not request, an automated AI review for this PR. <!-- You are welcome to do so in your own fork. -->\r\n\r\n<!-- Leave the following items unchecked if not applicable. -->\r\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [x] I have added or updated relevant tests.\r\n- [x] I have added or updated relevant docs, including release notes if applicable.\r\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.\r\n",
+      "captured_at": "2026-09-19T02:16:08.217824Z",
+      "case_id": "django-21754",
+      "changed_files": [
+        {
+          "additions": 42,
+          "deletions": 0,
+          "path": "django/contrib/admin/formfields.py",
+          "previous_filename": null,
+          "status": "added"
+        },
+        {
+          "additions": 23,
+          "deletions": 6,
+          "path": "django/contrib/admin/options.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 6,
+          "deletions": 0,
+          "path": "docs/releases/6.1.1.txt",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 18,
+          "deletions": 1,
+          "path": "tests/admin_changelist/admin.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 5,
+          "deletions": 1,
+          "path": "tests/admin_changelist/models.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 118,
+          "deletions": 6,
+          "path": "tests/admin_changelist/tests.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "multi-finding",
+      "diff_sha256": "8bf0324a2f528aeb34d58d6e4b8882e51c799d2632ca31abb735555928ea75d2",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "1a180c837c27206932cd6abc14d3ef654390d9a9",
+      "head_snapshot_commit": "7ce849bee674830c7e9656b37a0ad3e246440d6e",
+      "head_snapshot_ref": "refs/snapshots/django-21754/head",
+      "head_tree_sha": "0373e411a6306cb4aabe1bbc6de15143cbd5479a",
+      "license": {
+        "html_url": "https://github.com/django/django/blob/73cc09f14f13fedddc14d6ba5b287cb33c24e4a4/LICENSE",
+        "name": "Other",
+        "path": "LICENSE",
+        "spdx_id": "NOASSERTION"
+      },
+      "merged_at": "2026-08-31T15:58:00Z",
+      "protocol_dry_run": true,
+      "pull_request": 21754,
+      "repository_base_tip_sha_at_capture": "73cc09f14f13fedddc14d6ba5b287cb33c24e4a4",
+      "repository_id": "django/django",
+      "requested_sampling_category": "multi-finding",
+      "sampling_rationale": "Six-file admin search correctness change chosen to stress multiple independently discoverable review concerns.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "django/django#21754",
+        "url": "https://github.com/django/django/pull/21754"
+      },
+      "title": "Fixed #37263 -- Fixed changelist __exact search crashes and over-matching."
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "dhoepp",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "e8a81de5e1fe6b52dbcbdd93345560097c1e58fb",
+      "base_snapshot_commit": "6111e13d35301d4b822703c3d40e41934c93de75",
+      "base_snapshot_ref": "refs/snapshots/urllib3-3786/base",
+      "base_tree_sha": "59d33e0f0c0cd04dabb4485a6ff218258673c915",
+      "body": "Found this while debugging SSL issues behind a corporate proxy in #3782. In forwarding mode there's only one TLS handshake and it was always using the destination ssl_context instead of the proxy one. Tunneling already worked because it has a dedicated _connect_tls_proxy() call. \r\n\r\nFix is a 4-line branch in connect() to pick the right context. Also added ValueError when ssl_context and use_forwarding_for_https=True are both set, per the issue spec.\r\n\r\n\r\nFixes #2577.\r\n\r\n\r\n\r\n## Root cause\r\n\r\nThe tunneling path (`proxy_is_tunneling`) was already handled correctly by `_connect_tls_proxy()`, which explicitly uses `proxy_config.ssl_context`. The forwarding path, however, fell through to the shared `_ssl_wrap_socket_and_match_hostname` call that always passed `self.ssl_context`.\r\n\r\n## History\r\n\r\nThe bug dates to 691679f7 (Sept 2020) when forwarding proxy support was first introduced — the forwarding path was added with `ssl_context=self.ssl_context` and never corrected.    \r\n\r\n## Fix\r\n\r\n\r\n```python\r\nif self.proxy_is_forwarding and self.proxy_config is not None:\r\n    tls_ssl_context = self.proxy_config.ssl_context\r\nelse:\r\n    tls_ssl_context = self.ssl_context\r\n```\r\n\r\n\r\n## Tests\r\n\r\n- Removed the `pytest.skip(\"Test is expected to fail due to urllib3/urllib3#2577\")` guard in `test_proxy_https_target_tls_error` — that test now passes directly.\r\n- Added `test_https_proxy_forwarding_uses_proxy_ssl_context` which verifies that an HTTPS forwarding proxy works correctly when only `proxy_ssl_context` is supplied (no `ca_certs` fallback).\r\n\r\n",
+      "captured_at": "2026-09-19T02:16:26.805125Z",
+      "case_id": "urllib3-3786",
+      "changed_files": [
+        {
+          "additions": 2,
+          "deletions": 0,
+          "path": "changelog/2577.bugfix.rst",
+          "previous_filename": null,
+          "status": "added"
+        },
+        {
+          "additions": 15,
+          "deletions": 1,
+          "path": "src/urllib3/connection.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 15,
+          "deletions": 0,
+          "path": "src/urllib3/poolmanager.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 133,
+          "deletions": 16,
+          "path": "test/with_dummyserver/test_proxy_poolmanager.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "multi-finding",
+      "diff_sha256": "7708494237d5cd26d86e5d10eb97106ea4bcad6b55be33ebd8ba62e2f7c24a7b",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "ca3151d13f9de266f14caa19c36ad6f4ed36657e",
+      "head_snapshot_commit": "9ff02fe3c872d23bb8b272207f8e444bfac13d47",
+      "head_snapshot_ref": "refs/snapshots/urllib3-3786/head",
+      "head_tree_sha": "f4a596a1ac445e5f3925d262a946a3f2e065c45f",
+      "license": {
+        "html_url": "https://github.com/urllib3/urllib3/blob/e8a81de5e1fe6b52dbcbdd93345560097c1e58fb/LICENSE.txt",
+        "name": "MIT License",
+        "path": "LICENSE.txt",
+        "spdx_id": "MIT"
+      },
+      "merged_at": "2026-06-12T13:27:09Z",
+      "protocol_dry_run": true,
+      "pull_request": 3786,
+      "repository_base_tip_sha_at_capture": "e8a81de5e1fe6b52dbcbdd93345560097c1e58fb",
+      "repository_id": "urllib3/urllib3",
+      "requested_sampling_category": "multi-finding",
+      "sampling_rationale": "Cross-layer proxy TLS change with implementation and integration tests chosen to stress multiple findings.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "urllib3/urllib3#3786",
+        "url": "https://github.com/urllib3/urllib3/pull/3786"
+      },
+      "title": "Fix proxy_ssl_context ignored for HTTPS forwarding proxies (#2577)"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "davidism",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "88120e9e9db38b6ccf851348542d5cd88e249881",
+      "base_snapshot_commit": "1c708b20949c17639d71d2e6e512a1b0a2e84fa7",
+      "base_snapshot_ref": "refs/snapshots/flask-2284/base",
+      "base_tree_sha": "f51013d4d9b1ac5261d96b28ebfa2f0cc15ebbdc",
+      "body": "Python on Windows supports mixed `/` and `\\` separators, so this doesn't break anything. `/` is already assumed to be the safe separator anyway.\r\n\r\nfixes #2033, closes #2059",
+      "captured_at": "2026-09-19T02:16:35.376822Z",
+      "case_id": "flask-2284",
+      "changed_files": [
+        {
+          "additions": 14,
+          "deletions": 8,
+          "path": "flask/helpers.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 12,
+          "deletions": 13,
+          "path": "tests/test_helpers.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "taxonomy-alias-heavy",
+      "diff_sha256": "90ffac60ac7b371fa88c0f601fd72094e321bb6ab781838fdaf59aae4910731a",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "2a6579430649d6514384ca592730c6995e140c43",
+      "head_snapshot_commit": "d3dbe3bb5e53bdf6d8311bbad49c1c5fcd49bc51",
+      "head_snapshot_ref": "refs/snapshots/flask-2284/head",
+      "head_tree_sha": "f10265fc3b5253f160c7b9810292634e84a3720c",
+      "license": {
+        "html_url": "https://github.com/pallets/flask/blob/88120e9e9db38b6ccf851348542d5cd88e249881/LICENSE",
+        "name": "Other",
+        "path": "LICENSE",
+        "spdx_id": "NOASSERTION"
+      },
+      "merged_at": "2017-05-16T00:11:35Z",
+      "protocol_dry_run": true,
+      "pull_request": 2284,
+      "repository_base_tip_sha_at_capture": "88120e9e9db38b6ccf851348542d5cd88e249881",
+      "repository_id": "pallets/flask",
+      "requested_sampling_category": "taxonomy-alias-heavy",
+      "sampling_rationale": "Safe path joining on Windows provides path-traversal/directory-traversal taxonomy alias pressure.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "pallets/flask#2284",
+        "url": "https://github.com/pallets/flask/pull/2284"
+      },
+      "title": "safe_join on Windows uses posixpath"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "yassinbahri",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "0751d5fed159fd9ff7edba522ece13c8c9d2a0d0",
+      "base_snapshot_commit": "91c1197b2d3b9d0bb3e0fbbc1a38c2fece3786a6",
+      "base_snapshot_ref": "refs/snapshots/django-21867/base",
+      "base_tree_sha": "9128bbe6cfe038632a0a767393b8ad61ff51a519",
+      "body": "#### Trac ticket number\n<!-- Replace XXXXX with the corresponding Trac ticket number. -->\n<!-- Or delete the line and write \"N/A - typo\" for typo fixes. -->\n\nticket-37312\n\n#### Branch description\n`QuerySet.in_bulk()` rebuilt `values()` and `values_list()` projections from `query.values_select` when the mapping key field wasn't selected. This omitted selected annotation and extra-select aliases stored in `query.selected`. The patch rebuilds from the complete selected projection and adds regression coverage for every affected iterable form.\n\n#### AI Assistance Disclosure (REQUIRED)\n<!-- Select exactly ONE of the following: -->\n- [ ] **No AI tools were used** in preparing this PR.\n- [x] **If AI tools were used**, I have disclosed which ones, and fully reviewed and verified their output.\n<!-- If AI tools were used, provide which tools were used here. -->\n\nI used OpenAI Codex to help investigate, implement, and test the patch. I manually reviewed all changes and verified them with Django's relevant test suite and pre-commit checks.\n\n#### Checklist\n- [x] This PR follows the [contribution guidelines](https://docs.djangoproject.com/en/stable/internals/contributing/writing-code/submitting-patches/).\n- [x] This PR **does not** disclose a security vulnerability (see [vulnerability reporting](https://docs.djangoproject.com/en/stable/internals/security/)).\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\n- [x] The commit message is written in past tense, mentions the ticket number (if applicable), and ends with a period (see [guidelines](https://docs.djangoproject.com/en/dev/internals/contributing/committing-code/#committing-guidelines)).\n- [x] I have not requested, and will not request, an automated AI review for this PR. <!-- You are welcome to do so in your own fork. -->\n\n<!-- Leave the following items unchecked if not applicable. -->\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\n- [x] I have added or updated relevant tests.\n- [x] I have added or updated relevant docs, including release notes if applicable.\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.",
+      "captured_at": "2026-09-19T02:16:44.079475Z",
+      "case_id": "django-21867",
+      "changed_files": [
+        {
+          "additions": 14,
+          "deletions": 5,
+          "path": "django/db/models/query.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 4,
+          "deletions": 0,
+          "path": "docs/releases/6.1.1.txt",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 88,
+          "deletions": 0,
+          "path": "tests/lookup/tests.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "cross-file-root-cause-symptom",
+      "diff_sha256": "0c6bd4cf26582425929b7ea6864e291aa2b4369d99a98392d1af6718fa93dd5f",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "be010d8220d9100a8b87122eddc586c8c9bc44f0",
+      "head_snapshot_commit": "97a180a6982d6c6a45d66906283e761065466337",
+      "head_snapshot_ref": "refs/snapshots/django-21867/head",
+      "head_tree_sha": "11f46470d0e47eb1619b94b1ac3fc8194a30dceb",
+      "license": {
+        "html_url": "https://github.com/django/django/blob/05aec0a4aa111b54b50daec64059fd18ac70b437/LICENSE",
+        "name": "Other",
+        "path": "LICENSE",
+        "spdx_id": "NOASSERTION"
+      },
+      "merged_at": "2026-09-02T15:23:15Z",
+      "protocol_dry_run": true,
+      "pull_request": 21867,
+      "repository_base_tip_sha_at_capture": "05aec0a4aa111b54b50daec64059fd18ac70b437",
+      "repository_id": "django/django",
+      "requested_sampling_category": "cross-file-root-cause-symptom",
+      "sampling_rationale": "ORM implementation and regression tests exercise root-cause versus observed-query symptom descriptions.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "django/django#21867",
+        "url": "https://github.com/django/django/pull/21867"
+      },
+      "title": "Fixed #37312, Refs #36605 -- Fixed annotation preservation and key selection in in_bulk()."
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "illia-v",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "c21b1c16cd8c08dd26876e223bc198a2b4de4fb3",
+      "base_snapshot_commit": "ce5ca7e10f1953eae82d376bfaf4c0b7a7a408a4",
+      "base_snapshot_ref": "refs/snapshots/urllib3-4960/base",
+      "base_tree_sha": "3cd78b3332d8470ce475fa0fc8be92d4e1fff3d2",
+      "body": "Fixes #3636\r\n\r\nA partial read could leave some data inside `_decoded_buffer`, this buffered data was ignored during the next full read with `amt=None`.",
+      "captured_at": "2026-09-19T02:16:51.940136Z",
+      "case_id": "urllib3-4960",
+      "changed_files": [
+        {
+          "additions": 2,
+          "deletions": 0,
+          "path": "changelog/3636.bugfix.rst",
+          "previous_filename": null,
+          "status": "added"
+        },
+        {
+          "additions": 6,
+          "deletions": 0,
+          "path": "src/urllib3/response.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 29,
+          "deletions": 0,
+          "path": "test/test_response.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "strong-objective-evidence",
+      "diff_sha256": "07036c7c75e032f9c835a4821f0fb605c3560811ee7db13cbe35d94dcb5cb8ef",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "ea687a19a86d8d0fcbc16c0737c41512efc80e87",
+      "head_snapshot_commit": "149100557dc685199e088cf0126a521c70819a91",
+      "head_snapshot_ref": "refs/snapshots/urllib3-4960/head",
+      "head_tree_sha": "c40868c0413586983fabd2dcfce6c8c1cf81db1e",
+      "license": {
+        "html_url": "https://github.com/urllib3/urllib3/blob/c21b1c16cd8c08dd26876e223bc198a2b4de4fb3/LICENSE.txt",
+        "name": "MIT License",
+        "path": "LICENSE.txt",
+        "spdx_id": "MIT"
+      },
+      "merged_at": "2026-04-28T18:56:14Z",
+      "protocol_dry_run": true,
+      "pull_request": 4960,
+      "repository_base_tip_sha_at_capture": "c21b1c16cd8c08dd26876e223bc198a2b4de4fb3",
+      "repository_id": "urllib3/urllib3",
+      "requested_sampling_category": "strong-objective-evidence",
+      "sampling_rationale": "Focused response-read correction includes a concrete reproducer-style regression test.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "urllib3/urllib3#4960",
+        "url": "https://github.com/urllib3/urllib3/pull/4960"
+      },
+      "title": "Fix full read with `amt=None` after a partial read"
+    },
+    {
+      "annotation_guide_version": "evidence-adjudication-guide-v2",
+      "author": "thejcannon",
+      "base_identity_method": "github-compare-merge-base",
+      "base_sha": "ca097c96f97d8d2a5da09b8ca736c7e78a2467f6",
+      "base_snapshot_commit": "3fb04b517a57892e086ec5a4bd209d6495456e91",
+      "base_snapshot_ref": "refs/snapshots/httpx-3699/base",
+      "base_tree_sha": "b2cd92bfaba3d927eb6db03a5064340ea7a6f827",
+      "body": "# Summary\r\n\r\nJust adding `FunctionAuth` to `httpx._auth`'s `__all__` so it can be imported as `httpx.FunctionAuth`.\r\n\r\n(Note this just seems to be an omission in https://github.com/encode/httpx/pull/3106)\r\n\r\n# Checklist\r\n\r\n- [x] I understand that this PR may be closed in case there was no previous discussion. (This doesn't apply to typos!)\r\n- [ ] ~I've added a test for each change that was introduced, and I tried as much as possible to make a single atomic change.~\r\n  - `tests/test_exported_members.py:test_exported_members` covers this\r\n- [ ] ~I've updated the documentation accordingly.~\r\n  - Also didn't seem worth documenting 🤷‍♂️ \r\n",
+      "captured_at": "2026-09-19T02:16:59.625801Z",
+      "case_id": "httpx-3699",
+      "changed_files": [
+        {
+          "additions": 4,
+          "deletions": 0,
+          "path": "CHANGELOG.md",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 0,
+          "path": "httpx/__init__.py",
+          "previous_filename": null,
+          "status": "modified"
+        },
+        {
+          "additions": 1,
+          "deletions": 1,
+          "path": "httpx/_auth.py",
+          "previous_filename": null,
+          "status": "modified"
+        }
+      ],
+      "coverage": "likely-clean",
+      "diff_sha256": "acf37a9389ad53fb8ce90681ad2a26c96a5959dfb73a6692f78949959d6c6be3",
+      "dry_run_iteration": 2,
+      "final_claim_eligible": false,
+      "head_sha": "4b9f63e507c4ea75fa59f6bbdfb103e2f014a6f9",
+      "head_snapshot_commit": "f7f606d90579ddf94ce104fee36180feef770686",
+      "head_snapshot_ref": "refs/snapshots/httpx-3699/head",
+      "head_tree_sha": "a0348e2a1b9fc43336690740213ea68fd833e703",
+      "license": {
+        "html_url": "https://github.com/encode/httpx/blob/ca097c96f97d8d2a5da09b8ca736c7e78a2467f6/LICENSE.md",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "path": "LICENSE.md",
+        "spdx_id": "BSD-3-Clause"
+      },
+      "merged_at": "2025-12-10T14:58:48Z",
+      "protocol_dry_run": true,
+      "pull_request": 3699,
+      "repository_base_tip_sha_at_capture": "ca097c96f97d8d2a5da09b8ca736c7e78a2467f6",
+      "repository_id": "encode/httpx",
+      "requested_sampling_category": "likely-clean",
+      "sampling_rationale": "Small public API export correction with changelog and explicit export declaration.",
+      "schema_version": 1,
+      "source": {
+        "kind": "public-github-pr",
+        "reference_id": "encode/httpx#3699",
+        "url": "https://github.com/encode/httpx/pull/3699"
+      },
+      "title": "Expose `FunctionAuth` in `__all__`"
+    }
+  ],
+  "dataset_id": "evoagent-evidence-adjudicated-pr-protocol-dry-run-v2",
+  "dataset_version": "0.2.0-protocol-dry-run",
+  "dry_run_iteration": 2,
+  "final_claim_eligible": false,
+  "protocol_dry_run": true,
+  "repository_count": 4
+}

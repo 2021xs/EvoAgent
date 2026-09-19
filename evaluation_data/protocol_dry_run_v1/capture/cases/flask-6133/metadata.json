@@ -1,0 +1,59 @@
+{
+  "annotation_guide_version": "evidence-adjudication-guide-v1",
+  "author": "davidism",
+  "base_sha": "3596b1ab61cea85edb8970e83ff61daa073facf8",
+  "base_snapshot_commit": "42b4d02316da67a91d4c3ed6a17c758663da0c29",
+  "base_snapshot_ref": "refs/snapshots/flask-6133/base",
+  "base_tree_sha": "3a23fde1c1d5ce46748e9a28683232bb81c6e039",
+  "body": "[RFC 10008](https://datatracker.ietf.org/doc/html/rfc10008) isn't accepted yet, but it's been kicking around for years and looks like it will pass. I'm adding it now so I don't have to watch it anymore.\r\n\r\nAdded `client.query` method in https://github.com/pallets/werkzeug/pull/3219. Adjusted the test here to account for Werkzeug not being released yet.\r\n\r\ncloses #3193 ",
+  "captured_at": "2026-09-18T18:58:28.905317Z",
+  "case_id": "flask-6133",
+  "changed_files": [
+    {
+      "additions": 1,
+      "deletions": 0,
+      "path": "CHANGES.rst",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 8,
+      "deletions": 0,
+      "path": "src/flask/sansio/scaffold.py",
+      "previous_filename": null,
+      "status": "modified"
+    },
+    {
+      "additions": 5,
+      "deletions": 2,
+      "path": "tests/test_basic.py",
+      "previous_filename": null,
+      "status": "modified"
+    }
+  ],
+  "coverage": "feature",
+  "diff_sha256": "cce6fa42cebe64072396ba3a3fb9d47523648b694338f14c48dddab7abf28073",
+  "final_claim_eligible": false,
+  "head_sha": "89992954ec71b594b1b911f98977cdc8ad46a057",
+  "head_snapshot_commit": "2690073c2b560fa1dec644acd5da56f59edf41ce",
+  "head_snapshot_ref": "refs/snapshots/flask-6133/head",
+  "head_tree_sha": "7116532123a508df15a14e9830cc93d29667c018",
+  "license": {
+    "html_url": "https://github.com/pallets/flask/blob/3596b1ab61cea85edb8970e83ff61daa073facf8/LICENSE.txt",
+    "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+    "path": "LICENSE.txt",
+    "spdx_id": "BSD-3-Clause"
+  },
+  "merged_at": "2026-08-11T20:19:14Z",
+  "protocol_dry_run": true,
+  "pull_request": 6133,
+  "repository_id": "pallets/flask",
+  "sampling_rationale": "Small routing feature with framework-level behavior.",
+  "schema_version": 1,
+  "source": {
+    "kind": "public-github-pr",
+    "reference_id": "pallets/flask#6133",
+    "url": "https://github.com/pallets/flask/pull/6133"
+  },
+  "title": "add `app.query` route decorator"
+}

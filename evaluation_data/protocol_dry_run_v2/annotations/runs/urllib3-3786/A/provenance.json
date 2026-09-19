@@ -1,0 +1,65 @@
+{
+  "annotator_id": "urllib3-3786-a",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:18:20.574898Z",
+  "context_policy_hash": "897b125218b933f1835bb6430d2a1da583301fa9261e9d329d19ef433b1cbdcb",
+  "context_policy_id": "frozen-repository-read-only-v2",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "src/urllib3/connection.py": 3,
+        "src/urllib3/connectionpool.py": 3,
+        "src/urllib3/poolmanager.py": 3,
+        "test/with_dummyserver/test_proxy_poolmanager.py": 1
+      },
+      "files_inspected": [
+        "src/urllib3/connection.py",
+        "src/urllib3/connectionpool.py",
+        "src/urllib3/poolmanager.py",
+        "test/with_dummyserver/test_proxy_poolmanager.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 133711,
+      "repeat_file_reads": 6,
+      "repository_read_search_tool_calls": 5,
+      "tool_result_chars": 49920,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 4
+    },
+    "exit_code": 0,
+    "input_tokens": 133711,
+    "output_tokens": 1146,
+    "repository_files_inspected": [
+      "src/urllib3/connection.py",
+      "src/urllib3/connectionpool.py",
+      "src/urllib3/poolmanager.py",
+      "test/with_dummyserver/test_proxy_poolmanager.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:17:40.890719Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:17:40.892002Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:18:17.601864Z  WARN codex_core::shell_snapshot: Failed to delete shell snapshot at AbsolutePathBuf(\"/Users/bytedance/.codex/shell_snapshots/01a0b774-810f-7af1-837b-fb803433847b.1789784260880827000.sh\"): Os { code: 2, kind: NotFound, message: \"No such file or directory\" }\n",
+    "tool_calls": 5,
+    "wall_clock_seconds": 39.767
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "1801c89c3fffdfb4def1bcd846eedf9be2d73491b094f1ffaabe2dff862d5271",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "68c602be-0ef3-4d6e-819a-fcbe04cd87d0",
+  "started_at": "2026-09-19T02:17:40.845214Z",
+  "tool_policy_hash": "b03b2fcc21f87888da456f292e4ce1f6b9e583b964f0dcca32546e4e984679b5",
+  "tool_policy_id": "codex-bounded-read-only-v2"
+}

@@ -1,0 +1,68 @@
+{
+  "annotator_id": "flask-6096-a",
+  "annotator_kind": "MODEL",
+  "blindness": {
+    "evoagent_prediction_visible": false,
+    "experiment_arm_visible": false,
+    "peer_annotation_visible": false,
+    "production_attribution_visible": false
+  },
+  "completed_at": "2026-09-19T02:22:05.057545Z",
+  "context_policy_hash": "0cfc0d10a0af493d72885e36b10c3c954d426067f22e0b5a96658253e7cd1073",
+  "context_policy_id": "frozen-repository-read-only-v1",
+  "execution": {
+    "cost_instrumentation": {
+      "file_read_counts": {
+        "src/flask/app.py": 1,
+        "src/flask/sansio/app.py": 1,
+        "src/flask/testing.py": 1,
+        "tests/test_basic.py": 1,
+        "tests/test_testing.py": 1
+      },
+      "files_inspected": [
+        "src/flask/app.py",
+        "src/flask/sansio/app.py",
+        "src/flask/testing.py",
+        "tests/test_basic.py",
+        "tests/test_testing.py"
+      ],
+      "input_token_breakdown": {
+        "initial_instruction_context": null,
+        "other_model_context": null,
+        "reason": "Codex CLI reports aggregate input tokens but not per-source token attribution.",
+        "repeat_reads": null,
+        "repository_tool_observations": null
+      },
+      "input_tokens": 76035,
+      "repeat_file_reads": 0,
+      "repository_read_search_tool_calls": 4,
+      "tool_result_chars": 24088,
+      "tool_result_token_volume": null,
+      "unique_files_inspected": 5
+    },
+    "exit_code": 0,
+    "input_tokens": 76035,
+    "output_tokens": 658,
+    "repository_files_inspected": [
+      "src/flask/app.py",
+      "src/flask/sansio/app.py",
+      "src/flask/testing.py",
+      "tests/test_basic.py",
+      "tests/test_testing.py"
+    ],
+    "stderr": "Reading additional input from stdin...\n2026-09-19T02:21:39.970934Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n2026-09-19T02:21:39.972077Z  WARN codex_rollout::list: state db discrepancy during find_thread_path_by_id_str_in_subdir: falling_back\n",
+    "tool_calls": 4,
+    "wall_clock_seconds": 25.156
+  },
+  "model": "gpt-5.6-sol",
+  "model_revision": "unreported-by-codex-cli",
+  "prompt_hash": "4b3493b17e06e99187239ff4288db36afbdd1f578b5222ab04a38e778784281c",
+  "prompt_version": "evidence-adjudication-guide-v2",
+  "provider": "openai",
+  "repository_access_mode": "FROZEN_REPOSITORY_READ_ONLY",
+  "role": "FIRST_PASS",
+  "run_id": "3ff09c87-0000-45df-b63f-c855b5d67f61",
+  "started_at": "2026-09-19T02:21:39.934809Z",
+  "tool_policy_hash": "211f242df76c38ef97fabae01ff88b5894efbf238210585c07554c58318a640b",
+  "tool_policy_id": "codex-read-only-local-repository-v1"
+}

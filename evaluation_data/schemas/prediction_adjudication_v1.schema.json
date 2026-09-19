@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoagent.local/schemas/prediction_adjudication_v1.schema.json",
+  "title": "Blind Prediction Adjudication v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "methodology_version", "pool_id", "case_id", "repository_id", "status", "issue_exists", "should_comment", "severity", "location_supported", "technical_evidence", "technical_rationale", "comment_usefulness_rationale", "provenance"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "methodology_version": {"const": "open-world-final-v3"},
+    "pool_id": {"type": "string", "minLength": 1},
+    "case_id": {"type": "string", "minLength": 1},
+    "repository_id": {"type": "string", "minLength": 1},
+    "status": {"enum": ["ADJUDICATED", "NEEDS_MORE_CONTEXT", "QUARANTINED"]},
+    "issue_exists": {"type": ["boolean", "null"]},
+    "should_comment": {"type": ["boolean", "null"]},
+    "severity": {"type": ["string", "null"]},
+    "location_supported": {"type": ["boolean", "null"]},
+    "technical_evidence": {"type": "array"},
+    "technical_rationale": {"type": "string"},
+    "comment_usefulness_rationale": {"type": "string"},
+    "provenance": {
+      "type": "object", "additionalProperties": true,
+      "required": ["adjudicator_id", "run_id", "repository_access_mode", "experiment_arm_visible", "release_identity_visible", "peer_arm_emissions_visible", "desired_metric_direction_visible"],
+      "properties": {
+        "repository_access_mode": {"const": "FROZEN_REPOSITORY_READ_ONLY"},
+        "experiment_arm_visible": {"const": false},
+        "release_identity_visible": {"const": false},
+        "peer_arm_emissions_visible": {"const": false},
+        "desired_metric_direction_visible": {"const": false}
+      }
+    }
+  }
+}

@@ -139,13 +139,17 @@ class ThreeArmBenchmarkRunner:
                     failure_stream=failure_ids,
                     evaluation_case_order=self.evaluation_case_order,
                     random_seed=self.random_seed,
+                    experiment_mode="CONTROLLED_SHARED_FAILURE_STREAM",
                 ),
             }
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "claim_scope": "BENCHMARK_RUNNER_SKELETON_NO_FINAL_RESULTS",
+            "experiment_mode": "CONTROLLED_SHARED_FAILURE_STREAM",
             "candidate_budget_per_failure": 1,
+            "promotion_limit_per_failure": 1,
             "evaluation_policy_id": evaluation_policy,
             "failure_stream": failure_ids,
+            "failure_stream_identity": arms[BENCHMARK_ARMS[0]]["run_manifest"]["failure_stream_identity"],
             "arms": arms,
         }

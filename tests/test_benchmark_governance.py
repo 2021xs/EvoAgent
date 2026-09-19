@@ -643,10 +643,13 @@ class ThreeArmRunnerTests(unittest.TestCase):
 
         runner = ThreeArmBenchmarkRunner(
             factory, git_commit="f" * 40, dataset_manifest_sha256="d" * 64,
-            model_identity={"provider": "test", "model": "fixed", "config_hash": "m"},
+            model_identity={"provider": "test", "model": "fixed", "model_revision": "rev-1", "config_hash": "m"},
             runtime_config={
-                "context_policy": "c", "tool_policy": "t",
-                "token_budget": 1000, "time_budget": 30,
+                "generation_config": "g", "tool_catalog": "catalog",
+                "context_policy": "c", "tool_policy": "t", "tool_budget": 10,
+                "step_budget": 20, "token_budget": 1000, "time_budget": 30,
+                "finding_gate": "gate-v1", "repository_snapshots": "snapshots-v1",
+                "candidate_budget": 1, "promotion_limit": 1,
                 "operational_gate": "operational-gate-v1",
             },
             matcher_identity={"version": "deterministic-v1", "sha256": "x"},
@@ -675,6 +678,7 @@ class ThreeArmRunnerTests(unittest.TestCase):
             self.assertIn("run_manifest_sha256", manifest)
             verify_run_manifest(manifest)
         self.assertEqual("operational-gate-v1", result["evaluation_policy_id"])
+        self.assertEqual("CONTROLLED_SHARED_FAILURE_STREAM", result["experiment_mode"])
 
         with tempfile.TemporaryDirectory() as directory:
             path = os.path.join(directory, "run.json")

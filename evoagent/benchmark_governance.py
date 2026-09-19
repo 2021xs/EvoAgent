@@ -1274,6 +1274,7 @@ def build_run_manifest(
     model_identity: Mapping[str, Any], runtime_config: Mapping[str, Any],
     matcher_identity: Mapping[str, Any], metric_identity: Mapping[str, Any],
     failure_stream: Sequence[str], evaluation_case_order: Sequence[str], random_seed: int,
+    experiment_mode: str = "CONTROLLED_SHARED_FAILURE_STREAM",
 ) -> Dict[str, Any]:
     body = {
         "schema_version": 1, "git_commit": _nonempty(git_commit, "git_commit"),
@@ -1283,18 +1284,21 @@ def build_run_manifest(
         "ending_release_id": _nonempty(ending_release_id, "ending_release_id"),
         "model_identity": dict(model_identity), "runtime_config": dict(runtime_config),
         "matcher_identity": dict(matcher_identity), "metric_identity": dict(metric_identity),
+        "experiment_mode": _nonempty(experiment_mode, "experiment_mode"),
         "failure_stream_identity": sha256_json(list(failure_stream)),
         "failure_stream_order": list(failure_stream), "random_seed": int(random_seed),
         "evaluation_case_order": list(evaluation_case_order),
         "evaluation_case_order_sha256": sha256_json(list(evaluation_case_order)),
     }
     required_runtime = {
-        "context_policy", "tool_policy", "token_budget", "time_budget",
-        "operational_gate",
+        "generation_config", "tool_catalog", "tool_policy", "tool_budget",
+        "step_budget", "token_budget", "time_budget", "context_policy",
+        "finding_gate", "repository_snapshots", "candidate_budget",
+        "promotion_limit", "operational_gate",
     }
     if not required_runtime.issubset(body["runtime_config"]):
         raise BenchmarkValidationError("run manifest is missing frozen runtime budgets/policies")
-    if not {"provider", "model", "config_hash"}.issubset(body["model_identity"]):
+    if not {"provider", "model", "model_revision", "config_hash"}.issubset(body["model_identity"]):
         raise BenchmarkValidationError("run manifest is missing model/provider/config identity")
     for name in ("matcher_identity", "metric_identity"):
         if not {"version", "sha256"}.issubset(body[name]):
